@@ -1,5 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 
+// https://github.dev/mdn/dom-examples/blob/main/media/web-dictaphone/scripts/app.js
+// https://github.dev/hackingbeauty/react-mic
+// https://developer.mozilla.org/en-US/docs/Web/API/MediaStream_Recording_API/Using_the_MediaStream_Recording_API
+
 // const userMediaAPI =
 //   navigator.mediaDevices.getUserMedia ||
 //   navigator.webkitGetUserMedia ||
