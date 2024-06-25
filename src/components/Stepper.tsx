@@ -46,8 +46,8 @@ const Stepper = (props: any) => {
           }
         })}
       </ol>
-      <div>
-        <div className="gap-4 mb-4 flex justify-center">{children}</div>
+      <div className="items-center gap-4 mb-4 flex w-full flex-col lg:flex-row  justify-center">
+        {children}
       </div>
     </>
   );

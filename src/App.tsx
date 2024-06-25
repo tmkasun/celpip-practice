@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useReducer } from "react";
+import React, { useEffect, useMemo, useReducer, useRef } from "react";
 import logo from "./logo.svg";
 import "./App.css";
 import useInterval from "./hooks/useInterval";
@@ -6,10 +6,12 @@ import useSound from "use-sound";
 import NumberInput from "./components/NumberInput";
 import Stepper from "./components/Stepper";
 import Timer from "./components/Timer";
+import useMic from "./hooks/useMic";
+
 import ding from "./sounds/ding.mp3";
 import end from "./sounds/end.mp3";
 import startNow from "./sounds/startNow.mp3";
-import useMic from "./hooks/useMic";
+import noise from "./sounds/noise.mp3";
 
 const TasksToTime: {
   [index: number]: { preparationTime: number; speakingTime: number };
@@ -49,7 +51,6 @@ const TasksToTime: {
 };
 
 function App() {
-  const [, forceRerender] = useReducer((x) => x + 1, 0);
   const [preparationTime, setPreparationCount] = React.useState<number>(60);
   const [speakingTime, setSpeakingTime] = React.useState<number>(60);
   const [hasStarted, setHasStarted] = React.useState<boolean>(false);
@@ -66,6 +67,7 @@ function App() {
   }, [currentTask]);
   const [dingSound] = useSound(ding);
   const [endSound] = useSound(end);
+  const noiseRef = useRef<HTMLAudioElement>(null);
   const {
     mediaURL,
     isRecording,
@@ -113,7 +115,7 @@ function App() {
   };
 
   useEffect(() => {
-    if (remainingPreparationTime === 1) {
+    if (remainingPreparationTime === 0) {
       startRecording();
     }
     if (remainingSpeakingTime === 0) {
@@ -131,7 +133,7 @@ function App() {
   useEffect(resetTask, [currentTask]);
   const audioRecording = mediaURL || previousRecording;
   return (
-    <div className="App flex justify-center">
+    <div className="App flex justify-center ">
       <div className="w-10/12">
         <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-gray-100">
           CELPIP Practice
@@ -142,7 +144,7 @@ function App() {
         <h4 className="mb-4 text-lg font-medium leading-none text-gray-900 dark:slate-500">
           Task {currentTask + 1}
         </h4>
-        <div>
+        <div className="flex-col flex justify-center gap-6 items-center ">
           <Stepper
             numberOfTasks={Object.keys(TasksToTime).length}
             currentTask={currentTask}
@@ -192,7 +194,7 @@ function App() {
                   <button
                     onClick={() => {
                       window.localStorage.removeItem(`task-${currentTask}`);
-                      forceRerender();
+                      window.location.reload();
                     }}
                     type="button"
                     className="text-red-600 bg-white rounded-full hover:bg-slate-100 p-2  focus:outline-none h-fit    font-normal text-xs"
@@ -216,40 +218,77 @@ function App() {
               )}
             </Timer>
           </Stepper>
-          {hasStarted ? (
-            <button
-              onClick={handleStartStop}
-              type="button"
-              className="focus:outline-none text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900"
-            >
-              Stop
-            </button>
-          ) : (
-            <button
-              onClick={handleStartStop}
-              type="button"
-              className="focus:outline-none text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800"
-            >
-              Start
-            </button>
-          )}
+          <div className=" flex-col gap-2 gap-x-2 w-1/2 justify-center items-center">
+            <div className="gap-2 flex justify-center items-center">
+              {hasStarted ? (
+                <button
+                  onClick={handleStartStop}
+                  type="button"
+                  className="focus:outline-none text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5  dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900"
+                >
+                  Stop
+                </button>
+              ) : (
+                <button
+                  onClick={handleStartStop}
+                  type="button"
+                  className="focus:outline-none text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5  dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800"
+                >
+                  Start
+                </button>
+              )}
+              <button
+                type="button"
+                className="focus:outline-none text-white bg-yellow-400 hover:bg-yellow-500 focus:ring-4 focus:ring-yellow-300 font-medium rounded-lg text-sm px-5 py-2.5  dark:focus:ring-yellow-900"
+                onClick={resetTask}
+              >
+                Reset
+              </button>
+            </div>
+            <div className="gap-2 mt-2 flex justify-between items-center">
+              <button
+                type="submit"
+                disabled={currentTask === 0}
+                className={`${
+                  currentTask === 0 ? "disabled:bg-slate-500" : ""
+                } text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800`}
+                onClick={() => {
+                  if (currentTask > 0) {
+                    setCurrentTask(
+                      (currentTask - 1) % Object.keys(TasksToTime).length
+                    );
+                  }
+                }}
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+                onClick={() => {
+                  setCurrentTask(
+                    (currentTask + 1) % Object.keys(TasksToTime).length
+                  );
+                }}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col-reverse sm:flex-row justify-center items-center mt-2 gap-2">
+          <audio ref={noiseRef} controls src={noise} />
           <button
-            type="button"
-            className="focus:outline-none text-white bg-yellow-400 hover:bg-yellow-500 focus:ring-4 focus:ring-yellow-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:focus:ring-yellow-900"
-            onClick={resetTask}
-          >
-            Reset
-          </button>
-          <button
-            type="submit"
-            className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+            className="py-2.5 px-5 me-2 mb-2 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700"
             onClick={() => {
-              setCurrentTask(
-                (currentTask + 1) % Object.keys(TasksToTime).length
-              );
+              if (noiseRef.current) {
+                noiseRef.current.play();
+                noiseRef.current.loop = true;
+                noiseRef.current.volume = 0.2;
+              }
             }}
           >
-            Next Task
+            Simulate Noise
           </button>
         </div>
       </div>
