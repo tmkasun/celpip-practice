@@ -12,6 +12,7 @@ import ding from "./sounds/ding.mp3";
 import end from "./sounds/end.mp3";
 import startNow from "./sounds/startNow.mp3";
 import noise from "./sounds/noise.mp3";
+import { blobToDataURL, dataURLtoBlob } from "./utils";
 
 const TasksToTime: {
   [index: number]: { preparationTime: number; speakingTime: number };
@@ -60,10 +61,21 @@ function App() {
     hasStarted ? 1000 : null
   );
   const previousRecording = useMemo(() => {
-    const previousRecording = window.localStorage.getItem(
+    const previousRecordingBlob = window.localStorage.getItem(
       `task-${currentTask}`
     );
-    return previousRecording;
+    if (!previousRecordingBlob) {
+      return null;
+    }
+    const data = dataURLtoBlob(previousRecordingBlob);
+    if (!data) {
+      return null;
+    }
+    const audioBlob = new Blob([data], {
+      type: "audio/webm",
+    });
+    const urlObject = URL.createObjectURL(audioBlob);
+    return urlObject;
   }, [currentTask]);
   const [dingSound] = useSound(ding);
   const [endSound] = useSound(end);
@@ -75,13 +87,19 @@ function App() {
     stopRecording,
     resetRecording,
     isComplete,
+    audioDataRef,
   } = useMic();
 
   useEffect(() => {
-    if (isComplete && mediaURL) {
-      window.localStorage.setItem(`task-${currentTask}`, mediaURL);
+    if (isComplete && audioDataRef.current) {
+      (async () => {
+        const data = await blobToDataURL(audioDataRef.current[0]);
+        if (data) {
+          window.localStorage.setItem(`task-${currentTask}`, data);
+        }
+      })();
     }
-  }, [isComplete, currentTask, mediaURL]);
+  }, [isComplete, currentTask, audioDataRef]);
 
   const [startNowSound] = useSound(startNow);
   useInterval(() => {

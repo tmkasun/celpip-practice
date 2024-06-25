@@ -36,7 +36,6 @@ export const useMic = (
           if (onRecordComplete) {
             onRecordComplete(audioDataRef.current, urlObject);
           }
-          audioDataRef.current = [];
           setIsComplete(true);
         };
         mediaRecorderRef.current.ondataavailable = function (e) {
@@ -100,6 +99,7 @@ export const useMic = (
     isRecording,
     setIsRecording,
     resetRecording,
+    audioDataRef,
   };
 };
 
