@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useReducer } from "react";
 import logo from "./logo.svg";
 import "./App.css";
 import useInterval from "./hooks/useInterval";
@@ -49,6 +49,7 @@ const TasksToTime: {
 };
 
 function App() {
+  const [, forceRerender] = useReducer((x) => x + 1, 0);
   const [preparationTime, setPreparationCount] = React.useState<number>(60);
   const [speakingTime, setSpeakingTime] = React.useState<number>(60);
   const [hasStarted, setHasStarted] = React.useState<boolean>(false);
@@ -185,7 +186,34 @@ function App() {
                 onDeduct={() => setSpeakingTime(speakingTime - 1)}
                 value={speakingTime}
               />
-              {audioRecording && <audio controls src={audioRecording} />}
+              {audioRecording && (
+                <div className="flex justify-center items-center gap-1">
+                  <audio className="grow" controls src={audioRecording} />
+                  <button
+                    onClick={() => {
+                      window.localStorage.removeItem(`task-${currentTask}`);
+                      forceRerender();
+                    }}
+                    type="button"
+                    className="text-red-600 bg-white rounded-full hover:bg-slate-100 p-2  focus:outline-none h-fit    font-normal text-xs"
+                  >
+                    <svg
+                      className="w-5 h-5 text-red-600 dark:text-white"
+                      aria-hidden="true"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 20 16"
+                    >
+                      <path
+                        stroke="currentColor"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M8 8v1h4V8m4 7H4a1 1 0 0 1-1-1V5h14v9a1 1 0 0 1-1 1ZM2 1h16a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1Z"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              )}
             </Timer>
           </Stepper>
           {hasStarted ? (
