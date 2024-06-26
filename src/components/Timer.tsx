@@ -7,7 +7,7 @@ interface ITimer {
 export default function Timer(props: ITimer) {
   const { name, children, value, isRecording } = props;
   return (
-    <div className="flex relative flex-col items-center justify-center gap-2 w-full max-w-sm p-4 bg-white border border-gray-200 rounded-lg shadow sm:p-8 dark:bg-gray-800 dark:border-gray-700">
+    <div className="flex relative flex-col items-center justify-start gap-4 w-full max-w-sm p-4 bg-white border border-gray-200 rounded-lg shadow sm:p-8 dark:bg-gray-800 dark:border-gray-700">
       <h5 className="mb-4 text-xl font-medium text-gray-500 dark:text-gray-400">
         {name}
       </h5>
@@ -21,7 +21,7 @@ export default function Timer(props: ITimer) {
           / Sec
         </span>
       </div>
-      <div className="flex flex-col justify-center items-center gap-1">
+      <div className="flex flex-col justify-center items-center gap-4">
         {children}
       </div>
       {isRecording && (

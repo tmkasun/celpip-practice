@@ -180,7 +180,7 @@ function App() {
                 onReveal={handleStartStop}
                 currentTask={currentTask}
               />
-              <div className="flex justify-center items-center grow w-full gap-5">
+              <div className="flex justify-center items-normal grow w-full gap-5">
                 <Timer
                   name="Preparation"
                   value={
