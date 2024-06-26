@@ -13,6 +13,7 @@ import end from "./sounds/end.mp3";
 import startNow from "./sounds/startNow.mp3";
 import { blobToDataURL, dataURLtoBlob } from "./utils";
 import NoisePlayer from "./components/NoisePlayer";
+import Questions from "./components/Questions";
 
 const TasksToTime: {
   [index: number]: { preparationTime: number; speakingTime: number };
@@ -173,68 +174,78 @@ function App() {
               setHasStarted(false);
             }}
           >
-            <Timer
-              name="Preparation"
-              value={
-                remainingPreparationTime >= 0 ? remainingPreparationTime : 0
-              }
-            >
-              <NumberInput
-                type="number"
-                onChange={(e) => {
-                  setPreparationCount(e.currentTarget.valueAsNumber);
-                  setTimeElapsed(0);
-                }}
-                value={preparationTime}
-                onAdd={() => setPreparationCount(preparationTime + 1)}
-                onDeduct={() => setPreparationCount(preparationTime - 1)}
+            <div className="flex flex-col w-full justify-center items-center">
+              <Questions
+                onRefresh={resetTask}
+                onReveal={handleStartStop}
+                currentTask={currentTask}
               />
-            </Timer>
-            <Timer
-              isRecording={isRecording}
-              name="Speaking"
-              value={remainingSpeakingTime}
-            >
-              <NumberInput
-                type="number"
-                onChange={(e) => {
-                  setSpeakingTime(e.currentTarget.valueAsNumber);
-                  setTimeElapsed(0);
-                }}
-                onAdd={() => setSpeakingTime(speakingTime + 1)}
-                onDeduct={() => setSpeakingTime(speakingTime - 1)}
-                value={speakingTime}
-              />
-              {audioRecording && (
-                <div className="flex justify-center items-center gap-1">
-                  <audio className="grow" controls src={audioRecording} />
-                  <button
-                    onClick={() => {
-                      window.localStorage.removeItem(`task-${currentTask}`);
-                      window.location.reload();
+              <div className="flex justify-center items-center grow w-full gap-5">
+                <Timer
+                  name="Preparation"
+                  value={
+                    remainingPreparationTime >= 0 ? remainingPreparationTime : 0
+                  }
+                >
+                  <NumberInput
+                    type="number"
+                    onChange={(e) => {
+                      setPreparationCount(e.currentTarget.valueAsNumber);
+                      setTimeElapsed(0);
                     }}
-                    type="button"
-                    className="text-red-600 bg-white rounded-full hover:bg-slate-100 p-2  focus:outline-none h-fit    font-normal text-xs"
-                  >
-                    <svg
-                      className="w-5 h-5 text-red-600 dark:text-white"
-                      aria-hidden="true"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 20 16"
-                    >
-                      <path
-                        stroke="currentColor"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M8 8v1h4V8m4 7H4a1 1 0 0 1-1-1V5h14v9a1 1 0 0 1-1 1ZM2 1h16a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1Z"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              )}
-            </Timer>
+                    value={preparationTime}
+                    onAdd={() => setPreparationCount(preparationTime + 1)}
+                    onDeduct={() => setPreparationCount(preparationTime - 1)}
+                  />
+                </Timer>
+                <Timer
+                  isRecording={isRecording}
+                  name="Speaking"
+                  value={remainingSpeakingTime}
+                >
+                  <NumberInput
+                    type="number"
+                    onChange={(e) => {
+                      setSpeakingTime(e.currentTarget.valueAsNumber);
+                      setTimeElapsed(0);
+                    }}
+                    onAdd={() => setSpeakingTime(speakingTime + 1)}
+                    onDeduct={() => setSpeakingTime(speakingTime - 1)}
+                    value={speakingTime}
+                  />
+                  {audioRecording && (
+                    <div className="flex justify-center items-center gap-1">
+                      <audio className="grow" controls src={audioRecording} />
+                      <button
+                        onClick={() => {
+                          window.localStorage.removeItem(`task-${currentTask}`);
+                          window.location.reload();
+                        }}
+                        type="button"
+                        className="text-red-600 bg-white rounded-full hover:bg-slate-100 p-2  focus:outline-none h-fit    font-normal text-xs"
+                      >
+                        <svg
+                          className="w-5 h-5 text-red-600 dark:text-white"
+                          aria-hidden="true"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 20 16"
+                        >
+                          <path
+                            stroke="currentColor"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M8 8v1h4V8m4 7H4a1 1 0 0 1-1-1V5h14v9a1 1 0 0 1-1 1ZM2 1h16a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1Z"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </Timer>
+              </div>
+            </div>
           </Stepper>
+
           <div className=" flex-col gap-2 gap-x-2 w-1/2 justify-center items-center">
             <div className="gap-2 flex justify-center items-center">
               {hasStarted ? (
