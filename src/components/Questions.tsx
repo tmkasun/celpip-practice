@@ -12,7 +12,7 @@ interface IQuestions {
 export default function Questions(props: IQuestions) {
   const { currentTask, onReveal, onRefresh } = props;
   const [isRevealed, setIsRevealed] = useState(false);
-  const questionsSet = questionsPool[`${currentTask + 1}`];
+  const questionsSet = questionsPool[`${currentTask}`];
 
   const [randomIndex, setRandomIndex] = useState(
     getRandomInt(0, questionsSet ? questionsSet.length - 1 : -1)

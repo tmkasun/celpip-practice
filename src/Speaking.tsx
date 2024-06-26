@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useReducer, useRef } from "react";
-import logo from "./logo.svg";
+import { Routes, Route, Outlet, Link, useParams } from "react-router-dom";
 import "./App.css";
 import useInterval from "./hooks/useInterval";
 import useSound from "use-sound";
@@ -52,12 +52,18 @@ const TasksToTime: {
   },
 };
 
-function App() {
+function Speaking() {
+  let { taskId = "1" } = useParams();
   const [preparationTime, setPreparationCount] = React.useState<number>(60);
   const [speakingTime, setSpeakingTime] = React.useState<number>(60);
   const [hasStarted, setHasStarted] = React.useState<boolean>(false);
   const [timeElapsed, setTimeElapsed] = React.useState<number>(0);
-  const [currentTask, setCurrentTask] = React.useState<number>(0);
+  const [currentTask, setCurrentTask] = React.useState<number>(
+    parseInt(taskId)
+  );
+  useEffect(() => {
+    setCurrentTask(parseInt(taskId));
+  }, [taskId]);
   const [delay, setDelay] = React.useState<number | null>(
     hasStarted ? 1000 : null
   );
@@ -141,8 +147,8 @@ function App() {
     }
   }, [currentTask, remainingPreparationTime, remainingSpeakingTime]);
   const resetTask = () => {
-    setPreparationCount(TasksToTime[currentTask + 1].preparationTime);
-    setSpeakingTime(TasksToTime[currentTask + 1].speakingTime);
+    setPreparationCount(TasksToTime[currentTask].preparationTime);
+    setSpeakingTime(TasksToTime[currentTask].speakingTime);
     setTimeElapsed(0);
     setHasStarted(false);
     setDelay(null);
@@ -160,7 +166,7 @@ function App() {
           Speaking
         </h3>
         <h4 className="mb-4 text-lg font-medium leading-none text-gray-900 dark:slate-500">
-          Task {currentTask + 1}
+          Task {currentTask}
         </h4>
         <div className="flex-col flex justify-center gap-6 items-center ">
           <Stepper
@@ -168,8 +174,8 @@ function App() {
             currentTask={currentTask}
             onClick={(taskId: number) => {
               setCurrentTask(taskId);
-              setPreparationCount(TasksToTime[taskId + 1].preparationTime);
-              setSpeakingTime(TasksToTime[taskId + 1].speakingTime);
+              setPreparationCount(TasksToTime[taskId].preparationTime);
+              setSpeakingTime(TasksToTime[taskId].speakingTime);
               setTimeElapsed(0);
               setHasStarted(false);
             }}
@@ -225,17 +231,20 @@ function App() {
                         className="text-red-600 bg-white rounded-full hover:bg-slate-100 p-2  focus:outline-none h-fit    font-normal text-xs"
                       >
                         <svg
-                          className="w-5 h-5 text-red-600 dark:text-white"
+                          className="w-6 h-6 text-red-600 dark:text-white"
                           aria-hidden="true"
                           xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
                           fill="none"
-                          viewBox="0 0 20 16"
+                          viewBox="0 0 24 24"
                         >
                           <path
                             stroke="currentColor"
+                            stroke-linecap="round"
                             stroke-linejoin="round"
                             stroke-width="2"
-                            d="M8 8v1h4V8m4 7H4a1 1 0 0 1-1-1V5h14v9a1 1 0 0 1-1 1ZM2 1h16a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1Z"
+                            d="M5 7h14m-9 3v8m4-8v8M10 3h4a1 1 0 0 1 1 1v3H9V4a1 1 0 0 1 1-1ZM6 7h12v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7Z"
                           />
                         </svg>
                       </button>
@@ -274,33 +283,30 @@ function App() {
               </button>
             </div>
             <div className="gap-2 mt-2 flex justify-between items-center">
-              <button
+              <Link
                 type="submit"
-                disabled={currentTask === 0}
+                to={
+                  currentTask === 1
+                    ? "/speaking/1"
+                    : `/speaking/${currentTask - 1}`
+                }
                 className={`${
                   currentTask === 0 ? "disabled:bg-slate-500" : ""
                 } text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800`}
-                onClick={() => {
-                  if (currentTask > 0) {
-                    setCurrentTask(
-                      (currentTask - 1) % Object.keys(TasksToTime).length
-                    );
-                  }
-                }}
               >
                 Back
-              </button>
-              <button
+              </Link>
+              <Link
                 type="submit"
                 className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-                onClick={() => {
-                  setCurrentTask(
-                    (currentTask + 1) % Object.keys(TasksToTime).length
-                  );
-                }}
+                to={
+                  currentTask < Object.keys(TasksToTime).length
+                    ? `/speaking/${currentTask + 1}`
+                    : "/speaking/1"
+                }
               >
                 Next
-              </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -310,4 +316,4 @@ function App() {
   );
 }
 
-export default App;
+export default Speaking;
