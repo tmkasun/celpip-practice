@@ -5,7 +5,7 @@ const Stepper = (props: any) => {
 
   return (
     <>
-      <ol className="flex items-center w-full mb-4 sm:mb-5">
+      <ol className="flex items-center w-full">
         {new Array(numberOfTasks).fill(null).map((_, index) => {
           const isLast = index === numberOfTasks - 1;
           const isCurrent = index + 1 === currentTask;
@@ -23,7 +23,7 @@ const Stepper = (props: any) => {
           );
           if (isLast) {
             return (
-              <li key={index} className="flex items-center w-full">
+              <li key={index} className="flex flex-grow-0 flex-shrink basis-0 items-center w-full">
                 {button}
               </li>
             );
@@ -48,7 +48,7 @@ const Stepper = (props: any) => {
           }
         })}
       </ol>
-      <div className="gap-4 mb-4 flex w-full flex-col lg:flex-row  justify-center">
+      <div className="gap-4 flex w-full flex-col lg:flex-row  justify-center">
         {children}
       </div>
     </>

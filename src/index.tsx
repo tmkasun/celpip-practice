@@ -4,6 +4,7 @@ import "./index.css";
 import Speaking from "./Speaking";
 import reportWebVitals from "./reportWebVitals";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import Writing from "./Writing";
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement
@@ -15,6 +16,9 @@ root.render(
         <Route path="/" element={<Navigate replace to="/speaking/1" />} />
         <Route path="/speaking/*">
           <Route path=":taskId" element={<Speaking />} />
+        </Route>
+        <Route path="/writing/*">
+          <Route path=":taskId" element={<Writing />} />
         </Route>
       </Routes>
     </BrowserRouter>

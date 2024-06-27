@@ -14,6 +14,7 @@ import startNow from "./sounds/startNow.mp3";
 import { blobToDataURL, dataURLtoBlob } from "./utils";
 import NoisePlayer from "./components/NoisePlayer";
 import Questions from "./components/Questions";
+import Navigate from "./components/Navigate";
 
 const TasksToTime: {
   [index: number]: { preparationTime: number; speakingTime: number };
@@ -158,17 +159,9 @@ function Speaking() {
   const audioRecording = mediaURL || previousRecording;
   return (
     <div className="App flex justify-center ">
-      <div className="w-10/12">
-        <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-gray-100">
-          CELPIP Practice
-        </h2>
-        <h3 className="text-lg font-medium text-center text-gray-500 dark:text-gray-400">
-          Speaking
-        </h3>
-        <h4 className="mb-4 text-lg font-medium leading-none text-gray-900 dark:slate-500">
-          Task {currentTask}
-        </h4>
-        <div className="flex-col flex justify-center gap-6 items-center ">
+      <div className="w-10/12 gap-4 flex flex-col">
+        <Navigate />
+        <div className="flex-col flex justify-center mt-8 gap-6 items-center ">
           <Stepper
             numberOfTasks={Object.keys(TasksToTime).length}
             currentTask={currentTask}

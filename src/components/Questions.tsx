@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import _questionsPool from "../questions/pool.json";
+import questionsPool from "../questions/pool";
 import { getRandomInt } from "../utils";
-
-const questionsPool = _questionsPool as Record<string, string[]>;
+import { useLocation } from "react-router";
 
 interface IQuestions {
   currentTask: number;
@@ -12,7 +11,9 @@ interface IQuestions {
 export default function Questions(props: IQuestions) {
   const { currentTask, onReveal, onRefresh } = props;
   const [isRevealed, setIsRevealed] = useState(false);
-  const questionsSet = questionsPool[`${currentTask}`];
+  const { pathname } = useLocation();
+  const taskName = pathname.split("/")[1] || "speaking";
+  const questionsSet = questionsPool[taskName][`${currentTask}`];
 
   const [randomIndex, setRandomIndex] = useState(
     getRandomInt(0, questionsSet ? questionsSet.length - 1 : -1)
