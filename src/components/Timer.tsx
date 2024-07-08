@@ -2,11 +2,19 @@ interface ITimer {
   name?: string;
   children?: React.ReactNode;
   unit?: string;
-  value: number;
+  remaining: number;
+  elapsed?: number;
   isRecording?: boolean;
 }
 export default function Timer(props: ITimer) {
-  const { name, children, value, isRecording, unit = "Sec" } = props;
+  const {
+    name,
+    children,
+    remaining,
+    isRecording,
+    unit = "Sec",
+    elapsed,
+  } = props;
   return (
     <div className="flex relative flex-col items-center justify-start gap-4 w-full max-w-sm p-4 bg-white border border-gray-200 rounded-lg shadow sm:p-8 dark:bg-gray-800 dark:border-gray-700">
       {name && (
@@ -16,12 +24,21 @@ export default function Timer(props: ITimer) {
       )}
       <div
         className={`flex items-baseline ${
-          value < 10 ? "text-red-700" : "text-gray-900"
+          remaining < 10 ? "text-red-700" : "text-gray-900"
         } dark:text-white`}
       >
-        <span className="text-5xl font-extrabold tracking-tight">{value}</span>
+        <span className="text-5xl font-extrabold tracking-tight">
+          {remaining}
+        </span>
         <span className="ms-1 text-xl font-normal text-gray-500 dark:text-gray-400">
           / {unit}
+        </span>
+      </div>
+      <div className="flex items-center justify-center gap-2">
+        <span className="text-xs text-gray-400 min-h-4 dark:text-gray-500">
+          {elapsed !== undefined &&
+            elapsed !== 0 &&
+            `Elapsed: ${Math.floor(elapsed / 60)} Mins and ${elapsed % 60} Sec`}
         </span>
       </div>
       {children && (

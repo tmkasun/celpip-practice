@@ -182,7 +182,7 @@ function Speaking() {
               <div className="flex justify-center items-normal grow w-full gap-5">
                 <Timer
                   name="Preparation"
-                  value={
+                  remaining={
                     remainingPreparationTime >= 0 ? remainingPreparationTime : 0
                   }
                 >
@@ -200,7 +200,7 @@ function Speaking() {
                 <Timer
                   isRecording={isRecording}
                   name="Speaking"
-                  value={remainingSpeakingTime}
+                  remaining={remainingSpeakingTime}
                 >
                   <NumberInput
                     type="number"

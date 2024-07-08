@@ -86,7 +86,11 @@ function Writing() {
             }}
           >
             <div className="flex flex-col w-full justify-center items-center">
-              <Timer value={Math.floor(remainingTaskTime / 60)} unit="Min" />
+              <Timer
+                remaining={Math.floor(remainingTaskTime / 60)}
+                elapsed={timeElapsed}
+                unit="Min"
+              />
               <Questions
                 onRefresh={resetTask}
                 onReveal={handleStartStop}
