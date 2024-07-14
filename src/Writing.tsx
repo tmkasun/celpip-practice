@@ -78,12 +78,6 @@ function Writing() {
           <Stepper
             numberOfTasks={Object.keys(TasksToTime).length}
             currentTask={currentTask}
-            onClick={(taskId: number) => {
-              setCurrentTask(taskId);
-              setTaskTime(TasksToTime[taskId].taskTime);
-              setTimeElapsed(0);
-              setHasStarted(false);
-            }}
           >
             <div className="flex flex-col w-full justify-center items-center">
               <Timer

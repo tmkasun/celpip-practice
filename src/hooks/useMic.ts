@@ -71,6 +71,7 @@ export const useMic = (
       setIsRecording(false);
       setIsComplete(false);
       setMediaURL("");
+      mediaRecorderRef.current?.stop();
       audioDataRef.current = [];
     }
   };

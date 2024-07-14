@@ -1,8 +1,10 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 const Stepper = (props: any) => {
   const { children, numberOfTasks, currentTask } = props;
-
+  const { pathname } = useLocation();
+  const taskPath = pathname.split("/");
+  taskPath.pop();
   return (
     <>
       <ol className="flex items-center w-full">
@@ -11,7 +13,7 @@ const Stepper = (props: any) => {
           const isCurrent = index + 1 === currentTask;
           const button = (
             <Link
-              to={`/speaking/${index + 1}`}
+              to={`${taskPath.join("/")}/${index + 1}`}
               className={`flex items-center justify-center w-10 h-10 dark:text-gray-200 ${
                 isCurrent
                   ? "bg-blue-100 dark:bg-blue-700 dark:text-green-200"
@@ -23,7 +25,10 @@ const Stepper = (props: any) => {
           );
           if (isLast) {
             return (
-              <li key={index} className="flex flex-grow-0 flex-shrink basis-0 items-center w-full">
+              <li
+                key={index}
+                className="flex flex-grow-0 flex-shrink basis-0 items-center w-full"
+              >
                 {button}
               </li>
             );
