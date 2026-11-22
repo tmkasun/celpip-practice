@@ -1,107 +1,63 @@
-import { useState, useRef, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
-// https://github.dev/mdn/dom-examples/blob/main/media/web-dictaphone/scripts/app.js
-// https://github.dev/hackingbeauty/react-mic
-// https://developer.mozilla.org/en-US/docs/Web/API/MediaStream_Recording_API/Using_the_MediaStream_Recording_API
+export default function useMic() {
+  const stream = useRef<MediaStream>();
+  const recorder = useRef<MediaRecorder>();
+  const result = useRef<Promise<Blob | null>>();
+  const generation = useRef(0);
 
-// const userMediaAPI =
-//   navigator.mediaDevices.getUserMedia ||
-//   navigator.webkitGetUserMedia ||
-//   navigator.mozGetUserMedia ||
-//   navigator.msGetUserMedia;
-
-export const useMic = (
-  onRecordComplete?: (rawAudioData: Blob[], urlObj: string) => void
-) => {
-  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioDataRef = useRef<Blob[]>([]);
-  const [mediaURL, setMediaURL] = useState<string>("");
-  const [isRecording, setIsRecording] = useState<boolean>(false);
-  const [isComplete, setIsComplete] = useState<boolean>(false);
-  useEffect(() => {
-    let _stream: MediaStream | null = null;
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      const constraints = { audio: true, video: false };
-      const onSuccuss = (stream: MediaStream) => {
-        _stream = stream;
-        setAudioStream(stream);
-        mediaRecorderRef.current = new MediaRecorder(stream);
-        mediaRecorderRef.current.onstop = () => {
-          const audioBlob = new Blob(audioDataRef.current, {
-            type: mediaRecorderRef.current?.mimeType,
-          });
-          const urlObject = URL.createObjectURL(audioBlob);
-          setMediaURL(urlObject);
-          if (onRecordComplete) {
-            onRecordComplete(audioDataRef.current, urlObject);
-          }
-          setIsComplete(true);
-        };
-        mediaRecorderRef.current.ondataavailable = function (e) {
-          audioDataRef.current.push(e.data);
-        };
-      };
-      const onError = (err: Error) => {
-        console.error("getUserMedia not supported", err);
-      };
-      // This is the line that will ask for permission
-      navigator.mediaDevices.getUserMedia(constraints).then(onSuccuss, onError);
-    } else {
-      console.error("getUserMedia not supported");
-    }
-    return () => {
-      if (_stream) {
-        _stream.getTracks().forEach((track) => {
-          track.stop();
-        });
-      }
-    };
+  const release = useCallback(() => {
+    generation.current += 1;
+    if (recorder.current?.state === "recording") recorder.current.stop();
+    stream.current?.getTracks().forEach((track) => track.stop());
+    recorder.current = undefined;
+    stream.current = undefined;
+    result.current = undefined;
   }, []);
 
-  const startRecording = () => {
-    if (audioStream) {
-      setIsRecording(true);
-      mediaRecorderRef.current?.start();
-      setIsComplete(false);
-    }
-  };
-  const resetRecording = () => {
-    if (audioStream) {
-      setIsRecording(false);
-      setIsComplete(false);
-      setMediaURL("");
-      mediaRecorderRef.current?.stop();
-      audioDataRef.current = [];
-    }
-  };
-  const stopRecording = () => {
-    if (audioStream) {
-      setIsRecording(false);
-      mediaRecorderRef.current?.stop();
-    }
-  };
-  const toggleRecording = () => {
-    if (isRecording) {
-      stopRecording();
-      setIsComplete(true);
-    } else {
-      startRecording();
-    }
-  };
+  useEffect(() => release, [release]);
 
-  return {
-    audioStream,
-    startRecording,
-    stopRecording,
-    toggleRecording,
-    isComplete,
-    mediaURL,
-    isRecording,
-    setIsRecording,
-    resetRecording,
-    audioDataRef,
-  };
-};
+  async function connect() {
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      throw new Error("Recording requires microphone support and HTTPS or localhost.");
+    }
+    const request = ++generation.current;
+    const media = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (generation.current !== request) {
+      media.getTracks().forEach((track) => track.stop());
+      return false;
+    }
+    stream.current = media;
+    return true;
+  }
 
-export default useMic;
+  function start() {
+    if (!stream.current?.active) return false;
+    try {
+      const recording = new MediaRecorder(stream.current);
+      const chunks: Blob[] = [];
+      const finished = new Promise<Blob | null>((resolve) => {
+        recording.ondataavailable = (event) => {
+          if (event.data.size) chunks.push(event.data);
+        };
+        recording.onstop = () => {
+          resolve(chunks.length ? new Blob(chunks, { type: recording.mimeType }) : null);
+        };
+        recording.onerror = () => resolve(null);
+      });
+      recording.start();
+      recorder.current = recording;
+      result.current = finished;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function stop() {
+    if (recorder.current?.state === "recording") recorder.current.stop();
+    return result.current ?? Promise.resolve(null);
+  }
+
+  return { connect, start, stop, release };
+}

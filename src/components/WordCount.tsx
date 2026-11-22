@@ -1,31 +1,8 @@
-import { useMemo } from "react";
-
-interface IWordCountProps {
-  text: string;
-  maxWords?: number;
-  minWords?: number;
-  threshold?: number;
-}
-export default function WordCount(props: IWordCountProps) {
-  const { text, maxWords = 200, minWords = 150 } = props;
-  const wordCount = useMemo(() => {
-    return text.trim().split(/\s+/).filter(Boolean).length;
-  }, [text]);
-  const isWithinThreshold = wordCount >= minWords && wordCount <= maxWords;
-  const isOverThreshold = wordCount > maxWords;
-  const isUnderThreshold = wordCount < minWords;
-  let color = "text-gray-500 dark:text-gray-300 bg-gray-50 dark:bg-gray-800";
-  if (isOverThreshold) {
-    color = "text-red-500 dark:text-red-300 bg-red-50 dark:bg-red-800";
-  } else if (isUnderThreshold) {
-    color =
-      "text-yellow-500 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-800";
-  } else if (isWithinThreshold) {
-    color = "text-green-500 dark:text-green-300 bg-green-50 dark:bg-green-800";
-  }
+export default function WordCount({ text }: { text: string }) {
+  const count = text.trim().split(/\s+/).filter(Boolean).length;
   return (
-    <div className={`p-4 text-sm rounded-lg ${color}`}>
-      Word Count <span className="font-medium text-lg">{wordCount}</span>
-    </div>
+    <p className={count >= 150 && count <= 200 ? "word-count in-range" : "word-count"}>
+      <strong>{count}</strong> {count === 1 ? "word" : "words"} <span>· Aim for 150–200</span>
+    </p>
   );
 }

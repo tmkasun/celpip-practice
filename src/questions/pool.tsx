@@ -1,113 +1,218 @@
-export const questions = {
-  speaking: {
-    "1": [
-      "Your friend is looking for a new generation laptop. Advise him on different laptops available in the market.",
-      "A brother is planning to buy a new car. Advise him about different cars available in your city.",
-      "A friend is looking for a job change. Advise him about different ways he can find new job.",
-      "A friend is looking for a summer job. Advise him about different ways he can find work for the summer.",
-      "Your younger sister is not sure about choosing medical or engineering stream. Advice her",
-      "A brother is planning to buy a new car. Advise him about different cars available in your city.",
-      "A friend is looking for a summer job. Advise him about different ways he can find work for the summer.",
-      "Give Advice : Your friend is looking for a new generation laptop",
-      "Your friend is planning to start a small business. Advise them on different business ideas.",
-      "A family member is considering adopting a pet. Advise them on different types of pets they can choose from.",
-      "Your colleague is thinking of learning a new programming language. Advise them on different languages they can consider.",
-      "A friend is planning a vacation. Advise them on different travel destinations they can explore.",
-      "Your sibling is interested in pursuing a career in the arts. Advise them on different artistic fields they can explore.",
-      "A neighbor is looking to improve their fitness. Advise them on different exercise routines they can try.",
-      "Your friend is planning to redecorate their home. Advise them on different interior design styles they can consider.",
-      "A classmate is struggling with time management. Advise them on different strategies they can use to manage their time effectively.",
-      "Your friend is considering starting a new hobby. Advise them on different hobbies they can try.",
-      "A friend is looking for a summer job. Advise him about different ways he can find work for the summer.",
-      "Your friend is looking for a good place to eat in your city.",
-      "Your younger sister is planning to go for higher studies abroad. Give her a advice to choose best destination country for higher studies.",
-      "A brother is planning to buy a new car. Advise him about different cars available in your city.",
-      "Your younger brother is not so good in English. Advice him ways to improve his English",
-      "A brother is planning to buy a new Bike. Advise him about different Bikes available .",
-      "Your younger sister is planning to go for higher studies abroad. Give her a advice to choose best destination country for higher studies.",
-      "Your younger brother recently started smoking. Advice him to give up the bad habit.",
-      "Your friend is paying too much attention to studies and is neglecting his health. Advice him to take part in games.",
-      "Your younger brother is not serious about his studies. Advice him to work hard for upcoming examination",
-      "Your younger sister failed in exam and is planning to give up studies. Advice her to continue her studies.",
-      "Your friend is traveling to the USA. Advice him to buy travel insurance.",
-      "Your friend is looking for a new generation laptop.",
-      "Your younger brother is planning to buy agricultural land for farming. Advice him to find online.",
-      "Your friend is looking for a good place to eat in your city.",
-      "Your friend is desperate to invest in Bitcoins. Advice him about the cryptocurrency.",
-      "Your friend is planning to adopt a child. Advice him about the things he should know before adoption.",
-      "A brother is planning to buy a new Bike. Advise him about different Bikes available .",
-      "Your friend is traveling to the USA. Advice him to buy travel insurance.",
-      "A family member is thinking of starting a healthy lifestyle. Advise them on different healthy habits they can adopt.",
-      "Your colleague is planning to improve their communication skills. Advise them on different ways they can enhance their communication abilities.",
-      "A friend is looking for ways to save money. Advise them on different money-saving techniques they can implement.",
-      "A neighbor is planning to learn a musical instrument. Advise them on different instruments they can consider learning.",
-      "Your friend is considering going vegan. Advise them on different vegan recipes and meal ideas.",
-      "Your cousin is planning to buy a new smartphone. Advise them on different smartphone brands and models available in the market.",
-      "A classmate is thinking of starting a YouTube channel. Advise them on different video content ideas they can explore.",
-      "Your friend is looking for ways to improve their public speaking skills. Advise them on different techniques they can practice.",
-      "A family member is planning to start a garden. Advise them on different types of plants they can grow.",
-      "Your colleague is considering learning a new skill. Advise them on different online learning platforms they can use.",
-      "A friend is thinking of starting a podcast. Advise them on different podcast hosting platforms they can use.",
-      "Your sibling is planning to start a fitness routine. Advise them on different types of exercises they can incorporate.",
-      "A neighbor is looking for ways to reduce stress. Advise them on different stress-relief techniques they can try.",
-      "Your friend is considering starting a book club. Advise them on different book genres they can explore.",
-      "Your cousin is planning to start a photography hobby. Advise them on different camera brands and models they can consider.",
-      "A classmate is thinking of starting a home-based business. Advise them on different business ideas they can pursue.",
-      "Your friend is looking for ways to improve their time management skills. Advise them on different time management techniques they can use.",
-      "Give advice to your younger sister, who is appearing for interview next week.",
-      "Your younger sister failed in exam and is planning to give up studies. Advice her to continue her studies.",
-      "Your younger brother is not so good in English. Advice him ways to improve his English",
-      "A brother is planning to buy a new car. Advise him about different cars available in your city.",
-      "Give Advice to your brother : He is confused about his carrier.",
-      "Your friend is looking for a new generation laptop.",
-      "Your younger sister is wasting time on social media platforms. Advice her benefits of staying away from social media",
-      "Your younger brother is planning to buy agricultural land for farming. Advice him to find online.",
-      "Your friend is looking for venue to celebrate his birthday. Advice him",
-      "A friend is looking for a job change. Advise him about different ways he can find new job.",
-      "Your school mate is planning to buy new house in your city.",
-      "A brother is planning to buy a new Bike. Advise him about different Bikes available .",
-      "Your friend is looking for joining dance classes.",
-      "Your younger sister is planning to go for higher studies abroad. Give her  advice to choose the best destination country for higher studies.",
-      "Your businessman friend is looking for advertising space. Advice him to try online marketing.",
-      "Your younger sister is planning to go for higher studies abroad. Give her a advice to choose best destination country for higher studies.",
-      "Your younger brother is not so good in English. Advice him ways to improve his English",
-      "Give advice to your younger brother, who is planning to apply for the Canadian work permit.",
-      "Your friend is looking for a good place to eat in your city.",
-      "Your younger brother is planning to buy a used car. Advice him to buy new car.",
-      "Your friend is planning to buy a new home theatre. Give him advice on how to choose the best dealer in the city.",
-      "A brother is planning to buy a new Bike. Advise him about different Bikes available .",
-      "Your friend is looking for a good place to eat in your city.",
-      "Your school mate is planning to buy new house in your city.",
-      "A friend is looking for a job change. Advise him about different ways he can find new job.",
-      "A friend is looking for a summer job. Advise him about different ways he can find work for the summer.",
-      "Your younger sister is wasting time on social media platforms. Advice her benefits of staying away from social media",
-      "A brother is planning to buy a new car. Advise him about different cars available in your city.",
-      "Your younger sister is planning to go for higher studies abroad. Give her a advice to choose best destination country for higher studies.",
-      "Your friend is looking for a good place to eat in your city.",
-      "Your friend is looking for a new generation laptop.",
-      "Give advice to your brother, who is planning to go to a party and drink.",
-      "Your younger sister is planning to go for higher studies abroad. Give her a advice to choose best destination country for higher studies.",
-      "Give Advice : Your friend is looking for a new generation laptop.",
-      "Give Advice to your brother : He is confused about his carrier.",
-      "Your friend is looking for venue to celebrate his birthday. Advice him",
-      "Your younger sister is not sure about choosing medical or engineering stream. Advice her",
-      "Your younger brother is planning to buy agricultural land for farming. Advice him to find online.",
-    ],
-  },
-  writing: {
-    "1": [
-      <p>
-        You recently went to a cinema where you tried watching a movie, however,
-        you were bothered by a group of teenagers who were very loud in front of
-        you. You complained to the manager but it was not paid attention to.
-        <br />
-        Write an email to a cinema manager in about 150-200 words. Your email
-        should include the following things:
-        <br />• Describe your situation • Explained what happened after you
-        complained to the manager • Suggest solutions to improve
-      </p>,
-    ],
-  },
-} as Record<string, Record<string, React.ReactNode[]>>;
+export type Skill = "writing" | "speaking";
+export type SetId = 1 | 2;
 
-export default questions;
+export const taskTitles = {
+  writing: ["Writing an Email", "Responding to Survey Questions"],
+  speaking: [
+    "Giving Advice",
+    "Talking about a Personal Experience",
+    "Describing a Scene",
+    "Making Predictions",
+    "Comparing and Persuading",
+    "Dealing with a Difficult Situation",
+    "Expressing Opinions",
+    "Describing an Unusual Situation",
+  ],
+};
+
+export const writingSeconds = [27 * 60, 26 * 60];
+export const speakingTimes = [
+  { preparation: 30, response: 90 },
+  { preparation: 30, response: 60 },
+  { preparation: 30, response: 60 },
+  { preparation: 30, response: 60 },
+  { selection: 60, preparation: 60, response: 60 },
+  { preparation: 60, response: 60 },
+  { preparation: 30, response: 90 },
+  { preparation: 30, response: 60 },
+];
+
+export interface Illustration {
+  file: string;
+  alt: string;
+}
+
+export interface Option {
+  title: string;
+  details: string[];
+  image: Illustration;
+}
+
+export interface Prompt {
+  context: string;
+  instruction: string;
+  points?: string[];
+  image?: Illustration;
+  comparison?: {
+    choices: [Option, Option];
+    alternative: Option;
+    instruction: string;
+  };
+}
+
+const market: Illustration = {
+  file: "farmers-market.webp",
+  alt: "At an outdoor market, a vendor serves a customer, a cyclist waits near a stall, oranges fall near a child, and a dog sniffs a shopping bag.",
+};
+
+const recreation: Illustration = {
+  file: "recreation-centre.webp",
+  alt: "In a recreation centre lobby, visitors arrive while people move chairs and basketballs and read a noticeboard.",
+};
+
+function option(title: string, details: string[], file: string): Option {
+  return { title, details, image: { file, alt: title } };
+}
+
+const sets: Record<SetId, Record<Skill, Prompt[]>> = {
+  1: {
+    writing: [
+      {
+        context: "Your neighbourhood recreation centre changed the hours of its evening classes. You can no longer attend the class you signed up for after work.",
+        instruction: "Write an email to the recreation centre manager in about 150–200 words.",
+        points: [
+          "Explain which class you signed up for and why you chose it.",
+          "Describe how the schedule change affects you.",
+          "Suggest a solution and ask the manager to respond.",
+        ],
+      },
+      {
+        context: "Your building has a small unused room. The management committee is asking residents how the room should be used.",
+        instruction: "Choose the option you prefer and explain your reasons in about 150–200 words.",
+        points: [
+          "Option A — Turn the room into a quiet shared workspace with desks and Wi-Fi.",
+          "Option B — Turn the room into a tool-lending room where residents can borrow equipment.",
+        ],
+      },
+    ],
+    speaking: [
+      {
+        context: "Your friend is moving to a new city for work and does not know anyone there.",
+        instruction: "Give your friend advice on meeting people and feeling at home during the first month.",
+      },
+      {
+        context: "Think about a time when you helped someone solve a problem.",
+        instruction: "Describe the situation, explain what you did and say what you learned from the experience.",
+      },
+      {
+        context: "Your friend cannot see the picture of the farmers’ market.",
+        instruction: "Describe what is happening in the picture so your friend can imagine the scene.",
+        image: market,
+      },
+      {
+        context: "Look at the same farmers’ market scene.",
+        instruction: "What do you think will happen next? Use details from the picture to support your predictions.",
+        image: market,
+      },
+      {
+        context: "You and your cousin need a shelter for a weekend camping trip.",
+        instruction: "Choose which of these two options you would take.",
+        comparison: {
+          choices: [
+            option("Compact dome tent", ["$85", "Sleeps two adults", "Easy to carry and quick to set up"], "compact-tent.webp"),
+            option("Cabin tent", ["$140", "Sleeps four adults", "Room to stand up and store bags"], "cabin-tent.webp"),
+          ],
+          alternative: option("Rain tarp", ["$55", "Open sides", "Can also cover a picnic table"], "rain-tarp.webp"),
+          instruction: "Your cousin suggests taking a rain tarp. Speak to your cousin and explain why your original choice is more suitable for the trip.",
+        },
+      },
+      {
+        context: "You promised to help your brother move on Saturday. Your supervisor has asked you to cover an unexpected shift at the same time.",
+        instruction: "Choose one person to speak to.",
+        points: [
+          "Speak to your brother and explain why you cannot help at the original time.",
+          "Speak to your supervisor and explain why you cannot take the shift.",
+        ],
+      },
+      {
+        context: "Some municipalities offer free public transit on weekends.",
+        instruction: "Do you think your municipality should do this? Explain your position and support it with specific reasons.",
+      },
+      {
+        context: "You are at a fair and see an unusual device that would be fun to bring to an event. Your friend is organizing that event.",
+        instruction: "Call your friend. Describe what the device looks like and explain how people might use it.",
+        image: {
+          file: "smoothie-bike.webp",
+          alt: "A stationary bicycle powers a clear blender jar full of fruit at a community fair.",
+        },
+      },
+    ],
+  },
+  2: {
+    writing: [
+      {
+        context: "Several people in your apartment building have received parcels at the wrong unit. You recently found one of your own deliveries on a different floor.",
+        instruction: "Write an email to the building manager in about 150–200 words.",
+        points: [
+          "Describe what happened to your delivery.",
+          "Explain why the issue matters to residents.",
+          "Suggest how the building could improve parcel delivery.",
+        ],
+      },
+      {
+        context: "Your town has funding for one new community service and wants residents to choose between two proposals.",
+        instruction: "Choose the option you would support and explain your reasons in about 150–200 words.",
+        points: [
+          "Option A — Run a weekly mobile library that visits different neighbourhoods.",
+          "Option B — Extend evening and weekend hours at the main library.",
+        ],
+      },
+    ],
+    speaking: [
+      {
+        context: "Your coworker would like to cycle to work but has never ridden in busy traffic.",
+        instruction: "Give your coworker practical advice on getting started and building confidence.",
+      },
+      {
+        context: "Think about a time when you had to change your plans unexpectedly.",
+        instruction: "Explain what you had planned, what changed and how you handled the situation.",
+      },
+      {
+        context: "Your friend cannot see the picture of the recreation centre.",
+        instruction: "Describe what is happening in the picture so your friend can imagine the scene.",
+        image: recreation,
+      },
+      {
+        context: "Look at the same recreation centre scene.",
+        instruction: "Explain what you think will happen next and what details in the picture led you to those predictions.",
+        image: recreation,
+      },
+      {
+        context: "You and your roommate want to buy something you can share for short errands around town.",
+        instruction: "Choose which of these two options suits you better.",
+        comparison: {
+          choices: [
+            option("City bicycle", ["$320", "Front basket for groceries", "Light enough to carry upstairs"], "city-bike.webp"),
+            option("Electric bicycle", ["$850", "Motor assists on hills", "Battery takes four hours to charge"], "electric-bike.webp"),
+          ],
+          alternative: option("Kick scooter", ["$180", "Folds for storage", "Designed for short trips on smooth paths"], "kick-scooter.webp"),
+          instruction: "Your roommate suggests a kick scooter. Speak to your roommate and compare it with the option you picked, explaining why your choice suits your errands.",
+        },
+      },
+      {
+        context: "Your neighbours asked you to watch their dog for a week. Another housemate says the apartment will be too noisy while they work from home.",
+        instruction: "Choose one person to speak to.",
+        points: [
+          "Speak to your neighbours and explain why you cannot watch their dog at your apartment.",
+          "Speak to your housemate and propose a way to care for the dog while respecting their work schedule.",
+        ],
+      },
+      {
+        context: "A local employer is considering a paid afternoon off every month for staff to volunteer in the community.",
+        instruction: "Do you think employers should offer this benefit? Explain your position with specific reasons.",
+      },
+      {
+        context: "You see a strange piece of rain gear at a market. A friend has been looking for something to wear while walking the dog after dark.",
+        instruction: "Call your friend. Describe what you see and explain how it might help on a rainy walk.",
+        image: {
+          file: "umbrella-hat.webp",
+          alt: "A red umbrella hat with an attached yellow light and transparent visor on a mannequin head.",
+        },
+      },
+    ],
+  },
+};
+
+export function getPrompt(skill: Skill, set: SetId, task: number): Prompt {
+  return sets[set][skill][task - 1];
+}

@@ -1,0 +1,204 @@
+.mock-page {
+  flex: 1;
+  min-width: 0;
+  --mock-forest: #163b33;
+  --mock-mint: #b7e4d4;
+  --mock-border: #cbd9d2;
+  --mock-panel: #f3f8f4;
+  background: #eaf1ec;
+}
+
+.mock-width {
+  width: min(1312px, calc(100% - clamp(1.5rem, 5vw, 5rem)));
+  margin-inline: auto;
+}
+
+.mock-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--mock-forest);
+  color: #fff;
+  border-bottom: 4px solid #81bda9;
+}
+
+.mock-toolbar-inner,
+.mock-toolbar-controls {
+  display: flex;
+  align-items: center;
+}
+
+.mock-toolbar-inner {
+  justify-content: space-between;
+  gap: 1.25rem;
+  min-height: 5.5rem;
+  padding-block: .8rem;
+}
+
+.mock-title p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 .45rem;
+  color: #c7e5da;
+  font-size: .82rem;
+  font-weight: 650;
+}
+
+.mock-title h1 {
+  font-size: clamp(1.25rem, 3vw, 1.85rem);
+  line-height: 1.16;
+  letter-spacing: -.035em;
+}
+
+.mock-title h1:focus { outline: none; }
+
+.mock-toolbar-controls {
+  flex-shrink: 0;
+  gap: .85rem;
+}
+
+.mock-clock {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  padding: .5rem .75rem;
+  border: 1px solid #75948a;
+  border-radius: .4rem;
+  background: #21483f;
+  color: #f2faf6;
+}
+
+.mock-clock span {
+  font-size: .84rem;
+  font-weight: 650;
+}
+
+.mock-clock time {
+  min-width: 5ch;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.24rem;
+  font-weight: 760;
+  text-align: right;
+}
+
+.mock-clock.recording {
+  border-color: #dfa79e;
+  background: #633c38;
+  color: #fff4f2;
+}
+
+.mock-clock.recording span::before {
+  display: inline-block;
+  width: .56rem;
+  height: .56rem;
+  margin-right: .38rem;
+  border-radius: 50%;
+  background: #f7a59d;
+  content: "";
+}
+
+.mock-toolbar .mock-next {
+  min-height: 2.75rem;
+  white-space: nowrap;
+  color: #113c31;
+  background: var(--mock-mint);
+}
+
+.mock-toolbar .mock-next:hover { background: #dbf4e9; }
+.mock-toolbar .mock-next:focus-visible { outline-color: #e0fdf1; }
+
+.mock-content { padding-block: 1.35rem 2.5rem; }
+.mock-content > .setup { margin-top: 1rem; }
+.mock-content > .back-link + .notice { margin-top: 1rem; }
+.mock-duration { color: var(--muted); font-size: .9rem; }
+
+.mock-workspace {
+  display: grid;
+  align-items: start;
+  gap: 1rem;
+}
+
+.mock-writing {
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  align-items: stretch;
+}
+
+.mock-speaking { grid-template-columns: minmax(0, 1fr) minmax(13rem, 17rem); }
+
+.mock-workspace .card,
+.mock-schedule {
+  border-color: var(--mock-border);
+  border-radius: .5rem;
+}
+
+.mock-workspace .prompt {
+  max-width: none;
+  background: var(--mock-panel);
+}
+
+.mock-workspace h2 {
+  font-size: 1.12rem;
+  line-height: 1.3;
+}
+
+.mock-workspace .prompt-body { margin-top: 1rem; }
+.mock-workspace .response { gap: .65rem; }
+.mock-workspace .response textarea {
+  min-height: clamp(17rem, 52vh, 33rem);
+  padding: .85rem;
+}
+
+.mock-workspace .prompt-image img { max-height: none; }
+.mock-workspace .option-card img { max-height: 10rem; }
+
+.mock-schedule {
+  border: 1px solid var(--mock-border);
+  padding: 1rem;
+  background: #fff;
+}
+
+.mock-schedule ol {
+  display: grid;
+  gap: .3rem;
+  margin: .65rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mock-schedule li {
+  display: flex;
+  justify-content: space-between;
+  gap: .55rem;
+  padding: .32rem .45rem;
+  border-radius: .3rem;
+  color: var(--muted);
+  font-size: .87rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mock-schedule li[aria-current="step"] {
+  background: #dfefe5;
+  color: #174539;
+  font-weight: 750;
+}
+
+.mock-session-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .8rem;
+  margin-top: 1.15rem;
+  color: var(--muted);
+  font-size: .85rem;
+}
+
+@media (max-width: 720px) {
+  .mock-toolbar-inner { flex-wrap: wrap; gap: .65rem; min-height: 0; }
+  .mock-toolbar-controls { width: 100%; justify-content: space-between; gap: .5rem; }
+  .mock-clock { padding: .4rem .55rem; gap: .45rem; }
+  .mock-clock time { font-size: 1.12rem; }
+  .mock-content { padding-top: .9rem; }
+  .mock-writing, .mock-speaking { grid-template-columns: minmax(0, 1fr); }
+  .mock-workspace .response textarea { min-height: 16rem; }
+}
