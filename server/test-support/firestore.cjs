@@ -1,9 +1,11 @@
 const assert = require("node:assert/strict");
+const { AsyncLocalStorage } = require("node:async_hooks");
 
 // Transactional Firestore substitute: staged writes roll back on failure, and reads
 // after writes are rejected just as they are by the Admin SDK.
 function memoryFirestore({ retryTransactions = false } = {}) {
   const data = new Map();
+  const transactionContext = new AsyncLocalStorage();
   let priorTransaction = Promise.resolve();
   const document = (path) => ({
     path,
@@ -25,7 +27,7 @@ function memoryFirestore({ retryTransactions = false } = {}) {
   }
   const db = {
     data,
-    inTransaction: false,
+    get inTransaction() { return transactionContext.getStore() === true; },
     collection,
     runTransaction(callback) {
       const next = priorTransaction.then(async () => {
@@ -55,13 +57,7 @@ function memoryFirestore({ retryTransactions = false } = {}) {
               writes.set(ref.path, structuredClone(value));
             },
           };
-          db.inTransaction = true;
-          let result;
-          try {
-            result = await callback(transaction);
-          } finally {
-            db.inTransaction = false;
-          }
+          const result = await transactionContext.run(true, () => callback(transaction));
           if (retryTransactions && attempt === 0) continue;
           for (const [path, value] of writes) data.set(path, value);
           return result;
