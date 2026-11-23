@@ -46,7 +46,6 @@ export interface WritingAiConfig {
 
 const messages: Record<string, string> = {
   sign_in: "Your Google session expired. Sign in again to use AI Writing.",
-  ineligible: "Confirm that you are 18 or older and in a supported region to use AI Writing.",
   account_limit: "You’ve reached your daily AI Writing limit. Try again after midnight Pacific time.",
   daily_limit: "AI Writing has reached its daily limit. Try again after midnight Pacific time.",
   busy: "AI Writing is busy. Wait a minute and try again.",
@@ -83,7 +82,7 @@ export async function writingAiRequest<T>(
     method: "POST",
     signal,
     headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-    body: JSON.stringify({ ...body, eligible: true }),
+    body: JSON.stringify(body),
   });
   const payload = await response.json().catch(() => undefined);
   if (!response.ok || !payload) throw new WritingAiError(response.status, payload?.error);

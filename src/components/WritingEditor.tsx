@@ -6,10 +6,11 @@ interface WritingEditorProps {
   editor: RefObject<HTMLTextAreaElement>;
   text: string;
   readOnly: boolean;
+  exam?: boolean;
   onChange: (text: string) => void;
 }
 
-export default function WritingEditor({ editor, text, readOnly, onChange }: WritingEditorProps) {
+export default function WritingEditor({ editor, text, readOnly, onChange, exam = false }: WritingEditorProps) {
   const [checker, setChecker] = useState<SpellingChecker | null>();
   const [reviewStart, setReviewStart] = useState<number | null>(null);
   const underlines = useRef<HTMLDivElement>(null);
@@ -17,16 +18,17 @@ export default function WritingEditor({ editor, text, readOnly, onChange }: Writ
   const focusReview = useRef(false);
 
   useEffect(() => {
+    if (exam) return;
     let active = true;
     import("../writingSpelling").then(({ loadSpellingChecker }) => loadSpellingChecker()).then(
       (loaded) => { if (active) setChecker(loaded); },
       () => { if (active) setChecker(null); },
     );
     return () => { active = false; };
-  }, []);
+  }, [exam]);
 
-  const issues = useMemo(() => checker?.find(text) ?? [], [checker, text]);
-  const reviewing = !readOnly && reviewStart !== null;
+  const issues = useMemo(() => (!exam && checker ? checker.find(text) : []), [checker, exam, text]);
+  const reviewing = !exam && !readOnly && reviewStart !== null;
   const index = issues.findIndex(({ start }) => start >= (reviewStart ?? 0));
   const issueIndex = index === -1 ? issues.length - 1 : index;
   const issue = reviewing ? issues[issueIndex] : undefined;
@@ -83,35 +85,40 @@ export default function WritingEditor({ editor, text, readOnly, onChange }: Writ
   let previousEnd = 0;
   return (
     <section className="card response">
-      <h2><label htmlFor="writing-response">Your response</label></h2>
+      <h2 className={exam ? "sr-only" : undefined}><label htmlFor="writing-response">Your response</label></h2>
       <div className="writing-editor">
         <textarea
           id="writing-response"
           ref={editor}
           lang="en-CA"
-          spellCheck={!checker}
+          spellCheck={!exam && !checker}
           autoCorrect="off"
           autoCapitalize="off"
+          placeholder={exam ? "Enter your response here." : undefined}
           value={text}
           onChange={(event) => onChange(event.target.value)}
-          onContextMenu={showSuggestions}
-          onScroll={syncScroll}
+          onContextMenu={exam ? undefined : showSuggestions}
+          onScroll={exam ? undefined : syncScroll}
           readOnly={readOnly}
         />
-        <div className="writing-underlines" ref={underlines} aria-hidden="true">
-          {issues.map(({ start, word }) => {
-            const prefix = text.slice(previousEnd, start);
-            previousEnd = start + word.length;
-            return <Fragment key={start}>{prefix}<mark>{word}</mark></Fragment>;
-          })}
-          {text.slice(previousEnd)}{"\n"}
-        </div>
+        {!exam && (
+          <div className="writing-underlines" ref={underlines} aria-hidden="true">
+            {issues.map(({ start, word }) => {
+              const prefix = text.slice(previousEnd, start);
+              previousEnd = start + word.length;
+              return <Fragment key={start}>{prefix}<mark>{word}</mark></Fragment>;
+            })}
+            {text.slice(previousEnd)}{"\n"}
+          </div>
+        )}
       </div>
       <div className="writing-footer">
-        <button type="button" className="button secondary" disabled={readOnly} aria-expanded={reviewing} onClick={() => setReviewStart(reviewing ? null : 0)}>
-          Spell check
-        </button>
-        <WordCount text={text} />
+        {!exam && (
+          <button type="button" className="button secondary" disabled={readOnly} aria-expanded={reviewing} onClick={() => setReviewStart(reviewing ? null : 0)}>
+            Spell check
+          </button>
+        )}
+        <WordCount text={text} showTarget={!exam} />
       </div>
       {reviewing && (
         <div

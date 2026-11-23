@@ -3,10 +3,12 @@ rules_version='2'
 service cloud.firestore {
   match /databases/{database}/documents {
     match /{collection}/{document=**} {
-      // The server manages Writing AI quota counters through the Admin SDK.
+      // The server manages Writing AI quotas, questions and viewing history through the Admin SDK.
       // Starter access to other collections expires on December 23, 2026.
       allow read, write: if collection != 'writingAiQuota'
         && collection != 'writingAiDaily'
+        && collection != 'writingAiQuestions'
+        && collection != 'writingAiSeen'
         && request.time < timestamp.date(2026, 12, 23);
     }
   }

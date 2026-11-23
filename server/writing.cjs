@@ -19,17 +19,15 @@ function bounded(maxLength) {
 }
 
 const task = { type: "integer", enum: taskNumbers };
-const eligible = { const: true };
 const answer = object({
   task,
   prompt: object({ context: bounded(1200), instruction: bounded(400), points: array(bounded(300), 2, 3) }),
   text: bounded(12000),
 });
 const validPromptRequest = ajv.compile(object({
-  eligible,
   tasks: { ...array(task, 1, 2), uniqueItems: true },
 }));
-const validFeedbackRequest = ajv.compile(object({ eligible, answers: array(answer, 1, 2) }));
+const validFeedbackRequest = ajv.compile(object({ answers: array(answer, 1, 2) }));
 
 const generationSchemas = {
   1: object({ context: text, recipient: text, points: array(text, 3) }),
@@ -93,7 +91,6 @@ class WritingError extends Error {
 }
 
 function parseRequest(operation, body) {
-  if (body?.eligible !== true) throw new WritingError(403, "ineligible");
   if (operation === "prompts" && validPromptRequest(body)) {
     return { tasks: [...body.tasks].sort() };
   }

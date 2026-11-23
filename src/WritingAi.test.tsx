@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom";
 import App from "./App";
 import { loadSessions, type Session } from "./practiceStorage";
+import { getPrompt } from "./questions/pool";
 import type { PromptSnapshot, TaskFeedback } from "./writingAi";
 
 const mockUser = { uid: "writing-user", email: "writer@example.com", getIdToken: jest.fn() };
@@ -88,7 +89,6 @@ async function chooseGenerated() {
 async function signIn() {
   const button = await screen.findByRole("button", { name: "Sign in with Google" });
   await act(async () => { fireEvent.click(button); });
-  fireEvent.click(await screen.findByRole("checkbox", { name: /I’m 18 or older/ }));
 }
 
 beforeEach(() => {
@@ -112,18 +112,19 @@ test("explains missing Firebase Authentication configuration when Google sign-in
   expect(screen.getByRole("button", { name: "Start mock" })).toBeDisabled();
 });
 
-test("opens the AI-generated mock setup from home and keeps built-in sets usable when AI is unavailable", async () => {
+test("opens Writing practice from home and keeps built-in sets usable when AI is unavailable", async () => {
   jest.spyOn(globalThis, "fetch").mockResolvedValue(json({ firebase: null }));
   open("/");
-  fireEvent.click(screen.getByRole("link", { name: "AI-generated" }));
+  fireEvent.click(screen.getByRole("link", { name: "Start Writing mock" }));
+  fireEvent.click(screen.getByRole("button", { name: "AI-generated" }));
 
   expect(screen.getByRole("button", { name: "AI-generated" })).toHaveAttribute("aria-pressed", "true");
   expect(await screen.findByText(/AI-generated prompts are unavailable/)).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Start mock" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Show prompt and start" })).toBeDisabled();
 
   fireEvent.click(screen.getByRole("button", { name: "Set 2" }));
   expect(screen.getByRole("button", { name: "Set 2" })).toHaveAttribute("aria-pressed", "true");
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Start mock" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Show prompt and start" })); });
   expect(screen.getByRole("timer")).toHaveTextContent("27:00");
   const [session] = loadSessions();
   expect(session.set).toBe(2);
@@ -137,13 +138,21 @@ test("waits for both generated prompts, grades the completed mock once and resto
   const page = open("/mock/writing");
   await chooseGenerated();
   fireEvent.click(screen.getByRole("button", { name: "Start mock" }));
-  expect(screen.getByRole("button", { name: "Generating prompts…" })).toBeDisabled();
+  expect(screen.getByRole("heading", { name: "Writing Task 1: Writing an Email" })).toHaveFocus();
+  expect(screen.getByRole("status")).toHaveTextContent("Generating prompts…");
+  expect(screen.getByRole("button", { name: "Next task" })).toBeDisabled();
+  expect(screen.queryByRole("heading", { name: "Set up your mock" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   expect(screen.queryByRole("timer")).not.toBeInTheDocument();
   expect(loadSessions()).toEqual([]);
   await act(async () => generation.resolve(json({ prompts })));
   expect(screen.getByText(prompts[0].prompt.context)).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: prompts[0].prompt.instruction })).toBeInTheDocument();
+  expect(screen.getByRole("textbox", { name: "Your response" })).toHaveFocus();
   expect(screen.getByRole("timer")).toHaveTextContent("27:00");
-  expect(calls.mock.calls.filter(([path]) => path === "/api/writing/prompts")).toHaveLength(1);
+  const generationCalls = calls.mock.calls.filter(([path]) => path === "/api/writing/prompts");
+  expect(generationCalls).toHaveLength(1);
+  expect(JSON.parse(String(generationCalls[0][1]?.body))).toEqual({ tasks: [1, 2] });
   fireEvent.change(screen.getByRole("textbox", { name: "Your response" }), { target: { value: "Please restore bicycle access." } });
   fireEvent.click(screen.getByRole("button", { name: /Next task/ }));
   expect(screen.getByText(prompts[1].prompt.context)).toBeInTheDocument();
@@ -155,10 +164,12 @@ test("waits for both generated prompts, grades the completed mock once and resto
   await waitFor(() => expect(calls).toHaveBeenCalledWith("/api/writing/feedback", expect.any(Object)));
   const [, options] = calls.mock.calls.find(([path]) => path === "/api/writing/feedback")!;
   expect(options?.headers).toMatchObject({ Authorization: "Bearer valid-token" });
-  expect(JSON.parse(String(options?.body)).answers).toEqual([
-    { ...prompts[0], text: "Please restore bicycle access." },
-    { ...prompts[1], text: "Raised beds would welcome more gardeners." },
-  ]);
+  expect(JSON.parse(String(options?.body))).toEqual({
+    answers: [
+      { ...prompts[0], text: "Please restore bicycle access." },
+      { ...prompts[1], text: "Raised beds would welcome more gardeners." },
+    ],
+  });
   fireEvent.change(screen.getByRole("textbox", { name: "One change for next time" }), { target: { value: "Keep my own notes." } });
   await act(async () => grading.resolve(json({ tasks: [taskFeedback(1), taskFeedback(2)], overallLevel: 9 })));
   expect(screen.getByText("Overall Writing estimate · Level 9")).toBeInTheDocument();
@@ -169,6 +180,66 @@ test("waits for both generated prompts, grades the completed mock once and resto
   await act(async () => { open("/review/" + loadSessions()[0].id); });
   expect(screen.getByText("Task 1 estimate · Level 9")).toBeInTheDocument();
   expect(calls.mock.calls.filter(([path]) => path === "/api/writing/feedback")).toHaveLength(1);
+});
+
+test("can return to setup during generation and ignore a cancelled request during retry", async () => {
+  const cancelled = deferred();
+  const retry = deferred();
+  const calls = enableApi(jest.fn().mockReturnValueOnce(cancelled.promise).mockReturnValueOnce(retry.promise));
+  open("/mock/writing");
+  await chooseGenerated();
+  fireEvent.click(screen.getByRole("button", { name: "Start mock" }));
+  await waitFor(() => expect(calls).toHaveBeenCalledWith("/api/writing/prompts", expect.any(Object)));
+  const signal = calls.mock.calls.find(([path]) => path === "/api/writing/prompts")![1]?.signal;
+
+  fireEvent.click(screen.getByRole("button", { name: "Back to setup" }));
+  expect(signal?.aborted).toBe(true);
+  expect(screen.getByRole("heading", { name: "Set up your mock" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Start mock" }));
+  await act(async () => cancelled.resolve(json({ prompts })));
+  expect(screen.getByRole("status")).toHaveTextContent("Generating prompts…");
+  expect(loadSessions()).toEqual([]);
+
+  await act(async () => retry.resolve(json({ prompts })));
+  expect(screen.getByRole("timer")).toHaveTextContent("27:00");
+  expect(loadSessions()).toHaveLength(1);
+});
+
+test("grades a built-in mock from review and restores the saved feedback", async () => {
+  const feedback = { tasks: [taskFeedback(1), { ...taskFeedback(2), level: 8 }], overallLevel: 9 };
+  const calls = enableApi(async () => json(feedback));
+  const page = open("/mock/writing?set=2");
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Start mock" })); });
+
+  const answers = ["My parcel was left on a different floor.", "I support extending the main library’s hours."];
+  fireEvent.change(screen.getByRole("textbox", { name: "Your response" }), { target: { value: answers[0] } });
+  fireEvent.click(screen.getByRole("button", { name: /Next task/ }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Your response" }), { target: { value: answers[1] } });
+  fireEvent.click(screen.getByRole("button", { name: /Finish section/ }));
+
+  expect(screen.getByRole("heading", { name: "Writing mock review" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Get AI feedback" })).toBeDisabled();
+  await signIn();
+  fireEvent.click(screen.getByRole("button", { name: "Get AI feedback" }));
+  expect(await screen.findByText("Overall Writing estimate · Level 9")).toBeInTheDocument();
+  const [attempt] = loadSessions();
+  expect(attempt.writingFeedback).toEqual(feedback);
+
+  page.unmount();
+  await act(async () => { open("/review/" + attempt.id); });
+  fireEvent.click(screen.getByRole("button", { name: "Task 2" }));
+  expect(screen.getByText("Task 2 estimate · Level 8")).toBeInTheDocument();
+
+  const operations = calls.mock.calls.filter(([path]) =>
+    String(path).startsWith("/api/writing/") && path !== "/api/writing/config"
+  );
+  expect(operations.map(([path]) => path)).toEqual(["/api/writing/feedback"]);
+  const [, options] = operations[0];
+  expect(JSON.parse(String(options?.body)).answers).toEqual(answers.map((text, index) => ({
+    task: index + 1,
+    text,
+    prompt: getPrompt("writing", 2, index + 1),
+  })));
 });
 
 test("reopens a generated drill from history with its exact prompt and answer", async () => {

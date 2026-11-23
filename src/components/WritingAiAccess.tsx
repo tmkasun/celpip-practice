@@ -10,8 +10,6 @@ interface WritingAiAccess {
   checking: boolean;
   ready: boolean;
   user: User | null;
-  eligible: boolean;
-  setEligible: (value: boolean) => void;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
   generate: (tasks: WritingTask[], signal: AbortSignal) => Promise<PromptSnapshot[]>;
@@ -33,8 +31,6 @@ export function WritingAiProvider({ children }: { children: ReactNode }) {
   const [client, setClient] = useState<{ auth: Auth; sdk: typeof import("firebase/auth") } | null>();
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [eligibleUid, setEligibleUid] = useState<string>();
-  const eligible = Boolean(user && user.uid === eligibleUid);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -54,7 +50,6 @@ export function WritingAiProvider({ children }: { children: ReactNode }) {
       unsubscribe = sdk.onAuthStateChanged(auth, (account) => {
         if (controller.signal.aborted) return;
         setUser(account);
-        setEligibleUid((uid) => uid === account?.uid ? uid : undefined);
         setReady(true);
       });
       setClient({ auth, sdk });
@@ -84,7 +79,6 @@ export function WritingAiProvider({ children }: { children: ReactNode }) {
   ) {
     if (!user) throw new WritingAiError(401, "sign_in");
     const account = user;
-    if (!eligible) throw new WritingAiError(403, "ineligible");
     async function send(forceRefresh = false) {
       const token = await account.getIdToken(forceRefresh);
       try {
@@ -123,15 +117,13 @@ export function WritingAiProvider({ children }: { children: ReactNode }) {
       checking: client === undefined,
       ready,
       user,
-      eligible,
-      setEligible: (value) => setEligibleUid(value ? user?.uid : undefined),
       signIn,
       signOut,
       generate: async (tasks, signal) => {
         const result = await request<{ prompts: PromptSnapshot[] }>("prompts", { tasks }, signal);
         if (!Array.isArray(result.prompts) || result.prompts.length !== tasks.length ||
-            tasks.some((task) => !result.prompts.some((item) => item.task === task && item.prompt?.context &&
-              item.prompt.instruction && item.prompt.points?.length === (task === 1 ? 3 : 2)))) {
+          tasks.some((task) => !result.prompts.some((item) => item.task === task && item.prompt?.context &&
+            item.prompt.instruction && item.prompt.points?.length === (task === 1 ? 3 : 2)))) {
           throw new WritingAiError(502, "provider_result");
         }
         return result.prompts;
@@ -150,7 +142,7 @@ export function useWritingAi() {
 }
 
 export function WritingAiControls({ disabled = false }: { disabled?: boolean }) {
-  const { ready, user, eligible, setEligible, signIn, signOut } = useWritingAi();
+  const { ready, user, signIn, signOut } = useWritingAi();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
 
@@ -177,15 +169,6 @@ export function WritingAiControls({ disabled = false }: { disabled?: boolean }) 
           {pending ? "Connecting…" : user ? "Sign out" : "Sign in with Google"}
         </button>
       </div>
-      {user && (
-        <div>
-          <label className="ai-eligibility">
-            <input type="checkbox" checked={eligible} onChange={(event) => setEligible(event.target.checked)} disabled={disabled} />
-            <span>I’m 18 or older and in a region where Gemini is available.</span>
-          </label>
-          <a className="text-link" href="https://aistudio.google.com/docs/available-regions" target="_blank" rel="noreferrer">Check supported regions</a>
-        </div>
-      )}
       {error && <p className="notice" role="alert">{error}</p>}
     </div>
   );

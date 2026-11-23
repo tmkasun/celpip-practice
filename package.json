@@ -22,7 +22,8 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "node server/dev.cjs",
+    "start:client": "react-scripts start",
     "build": "react-scripts build",
     "serve": "node --env-file-if-exists=.env.server server/index.cjs",
     "test": "react-scripts test",

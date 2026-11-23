@@ -36,8 +36,13 @@ afterEach(() => {
 test("opens the practice home and connects all four skills to practice", () => {
   open();
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Practice for test day");
-  expect(screen.getByRole("link", { name: "Start Writing mock" })).toHaveAttribute("href", "/mock/writing");
-  expect(screen.getByRole("link", { name: "Start Speaking mock" })).toHaveAttribute("href", "/mock/speaking");
+  const writing = within(screen.getByRole("heading", { name: "Writing" }).closest("section")!);
+  const speaking = within(screen.getByRole("heading", { name: "Speaking" }).closest("section")!);
+  expect(writing.getByRole("link", { name: "Start Writing mock" })).toHaveAttribute("href", "/writing/1");
+  expect(speaking.getByRole("link", { name: "Start Speaking mock" })).toHaveAttribute("href", "/speaking/1");
+  expect(writing.getAllByRole("link")).toHaveLength(1);
+  expect(speaking.getAllByRole("link")).toHaveLength(1);
+  expect(writing.getByText("AI mock available")).toBeInTheDocument();
   for (const skill of ["Listening", "Reading"]) {
     expect(screen.getByRole("link", { name: "Official " + skill + " practice" }))
       .toHaveAttribute("href", "https://www.celpip.ca/free-practice-tests/");
@@ -52,7 +57,10 @@ test("expires each Writing mock task once and keeps the responses attached to th
   expect(within(toolbar).getByRole("timer")).toHaveTextContent("27:00");
   expect(within(toolbar).getByRole("button", { name: "Next task" })).toBeEnabled();
   expect(screen.queryByRole("navigation", { name: "Main navigation" })).toBeNull();
-  fireEvent.change(screen.getByRole("textbox", { name: "Your response" }), { target: { value: "My first response." } });
+  const editor = screen.getByRole("textbox", { name: "Your response" });
+  expect(editor).toHaveAttribute("spellcheck", "false");
+  expect(screen.queryByRole("button", { name: "Spell check" })).not.toBeInTheDocument();
+  fireEvent.change(editor, { target: { value: "My first response." } });
 
   await advance(writingSeconds[0]);
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Responding to Survey Questions");

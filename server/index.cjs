@@ -2,6 +2,7 @@ const path = require("node:path");
 const express = require("express");
 const { createGemini, parseRequest, WritingError } = require("./writing.cjs");
 const { createQuota } = require("./quota.cjs");
+const { createQuestionBank } = require("./question-bank.cjs");
 
 function limit(name, fallback) {
   const value = Number(process.env[name] ?? fallback);
@@ -39,7 +40,7 @@ function readConfig() {
   return config;
 }
 
-function createApp({ firebase, verifyIdToken, reserve, runGemini, log = console.info } = {}) {
+function createApp({ firebase, verifyIdToken, reserve, runGemini, questionBank, log = console.info } = {}) {
   const app = express();
   app.disable("x-powered-by");
   app.use("/api", (_req, res, next) => {
@@ -53,6 +54,8 @@ function createApp({ firebase, verifyIdToken, reserve, runGemini, log = console.
     app.post("/api/writing/" + operation, readJson, async (req, res) => {
       const startedAt = Date.now();
       let reservingQuota = false;
+      const metrics = operation === "prompts" ? { cacheHits: 0, generatedTasks: 0 } : {};
+      const logResult = (result) => log(JSON.stringify({ operation, result, ...metrics, durationMs: Date.now() - startedAt }));
       try {
         if (!firebase) throw new WritingError(503, "unavailable");
         const token = req.get("Authorization")?.match(/^Bearer ([^\s]+)$/i)?.[1];
@@ -62,17 +65,28 @@ function createApp({ firebase, verifyIdToken, reserve, runGemini, log = console.
           throw new WritingError(401, "sign_in");
         }
         const input = parseRequest(operation, req.body);
-        reservingQuota = true;
-        await reserve(user.uid);
-        reservingQuota = false;
-        const result = await runGemini(operation, input);
-        log(JSON.stringify({ operation, result: "ok", durationMs: Date.now() - startedAt }));
+        const run = async (data) => {
+          reservingQuota = true;
+          await reserve(user.uid);
+          reservingQuota = false;
+          if (operation === "prompts") metrics.generatedTasks += data.tasks.length;
+          return runGemini(operation, data);
+        };
+        let result;
+        if (operation === "prompts") {
+          const cached = await questionBank.getPrompts(user.uid, input.tasks, (tasks) => run({ tasks }));
+          metrics.cacheHits = cached.cacheHits;
+          result = { prompts: cached.prompts };
+        } else {
+          result = await run(input);
+        }
+        logResult("ok");
         res.json(result);
       } catch (error) {
         const result = error instanceof WritingError ? error :
           new WritingError(503, reservingQuota ? "quota_unavailable" : "unavailable");
         if (result.retryAfter) res.set("Retry-After", String(result.retryAfter));
-        log(JSON.stringify({ operation, result: result.code, durationMs: Date.now() - startedAt }));
+        logResult(result.code);
         res.status(result.status).json({ error: result.code });
       }
     });
@@ -100,15 +114,25 @@ function start() {
     const { getAuth } = require("firebase-admin/auth");
     const { initializeFirestore } = require("firebase-admin/firestore");
     const firebaseApp = initializeApp({ projectId: config.firebase.projectId });
+    const db = initializeFirestore(firebaseApp, { preferRest: true });
     services = {
       firebase: config.firebase,
       verifyIdToken: (token) => getAuth(firebaseApp).verifyIdToken(token),
-      reserve: createQuota(initializeFirestore(firebaseApp, { preferRest: true }), config.limits),
+      reserve: createQuota(db, config.limits),
       runGemini: createGemini(config),
+      questionBank: createQuestionBank(db),
     };
   }
   const port = process.env.PORT ?? 8080;
-  createApp(services).listen(port, () => console.info("CELPIP Practice is listening on port " + port));
+  const server = createApp(services).listen(port);
+  server.once("listening", () => {
+    console.info("CELPIP Practice is listening on port " + port);
+    process.send?.("listening");
+  });
+  server.once("error", (error) => {
+    console.error("Could not start the Writing API on port " + port + ". " + error.message);
+    process.exitCode = 1;
+  });
 }
 
 if (require.main === module) start();

@@ -4,7 +4,7 @@ import useSound from "use-sound";
 import NoisePlayer from "./components/NoisePlayer";
 import PromptView from "./components/PromptView";
 import { useWritingAi, WritingAiControls } from "./components/WritingAiAccess";
-import WritingEditor from "./components/WritingEditor";
+import WritingWorkspace from "./components/WritingWorkspace";
 import useCountdown, { formatTime } from "./hooks/useCountdown";
 import useMic from "./hooks/useMic";
 import { audioKey, getSessionPrompt, type Response, type Session } from "./practiceStorage";
@@ -14,7 +14,7 @@ import ding from "./sounds/ding.mp3";
 import end from "./sounds/end.mp3";
 import "./Mock.css";
 
-type PhaseName = "ready" | "select" | "prepare" | "record" | "write" | "saving";
+type PhaseName = "ready" | "generating" | "select" | "prepare" | "record" | "write" | "saving";
 
 interface Phase {
   name: PhaseName;
@@ -35,6 +35,7 @@ interface PracticeProps {
 
 const phaseLabels: Record<PhaseName, string> = {
   ready: "Ready",
+  generating: "Generating prompts…",
   select: "Choose an option",
   prepare: "Prepare to speak",
   record: "Recording",
@@ -127,10 +128,16 @@ export default function Practice({ skill, mode, firstTask, initialSet, initialAi
     };
   }, [mode, save, skill]);
 
-  const focusTarget = phase.name === "write" ? "editor" : phase.name === "ready" || phase.name === "select" ? phase.name : "heading";
+  const ready = phase.name === "ready";
+  const generating = phase.name === "generating";
+  const isMock = mode === "mock";
+  const writingTask = skill === "writing" && !ready;
+  const showToolbar = isMock || writingTask;
+  const focusTarget = phase.name === "write" ? "editor" :
+    ready || generating || phase.name === "select" ? phase.name : "heading";
   useEffect(() => {
-    if (mode === "mock" && window.scrollY > 0) window.scrollTo(0, 0);
-  }, [mode, phase.task]);
+    if (showToolbar && window.scrollY > 0) window.scrollTo(0, 0);
+  }, [showToolbar, phase.task, writingTask]);
 
   useEffect(() => {
     if (focusTarget === "editor") editor.current?.focus({ preventScroll: true });
@@ -177,24 +184,28 @@ export default function Practice({ skill, mode, firstTask, initialSet, initialAi
     if (requestPending.current || livePhase.current.name !== "ready") return;
     let writingPrompts: PromptSnapshot[] | undefined;
     if (useAi) {
-      if (!ai.available || !ai.eligible) return;
+      if (!ai.available || !ai.user) return;
       const controller = new AbortController();
       generation.current = controller;
       requestPending.current = true;
       setPending(true);
       setAiMessage("");
+      if (isMock) switchPhase({ name: "generating", task: firstTask });
       try {
-        writingPrompts = await ai.generate(mode === "mock" ? [1, 2] : [firstTask as WritingTask], controller.signal);
-        if (controller.signal.aborted) return;
+        writingPrompts = await ai.generate(isMock ? [1, 2] : [firstTask as WritingTask], controller.signal);
+        if (!mounted.current || controller.signal.aborted) return;
       } catch (error) {
         if (mounted.current && !controller.signal.aborted) {
           setAiMessage(error instanceof WritingAiError ? error.message : "Couldn’t generate a prompt. Try again or choose a built-in set.");
+          if (isMock) switchPhase({ name: "ready", task: firstTask });
         }
         return;
       } finally {
-        generation.current = undefined;
-        requestPending.current = false;
-        if (mounted.current) setPending(false);
+        if (generation.current === controller) {
+          generation.current = undefined;
+          requestPending.current = false;
+          if (mounted.current) setPending(false);
+        }
       }
     }
     if (skill === "speaking") {
@@ -306,34 +317,49 @@ export default function Practice({ skill, mode, firstTask, initialSet, initialAi
     navigate("/review/" + current.id);
   }
 
-  const ready = phase.name === "ready";
+  function cancelGeneration() {
+    generation.current?.abort();
+    generation.current = undefined;
+    requestPending.current = false;
+    setPending(false);
+    switchPhase({ name: "ready", task: firstTask });
+  }
+
   const clock = phase.deadline !== undefined;
   const lastTask = phase.task === titles.length;
-  const isMock = mode === "mock";
   const sectionName = skill === "writing" ? "Writing" : "Speaking";
   const generated = Boolean(session?.writingPrompts);
-  const promptLabel = generated || (ready && useAi) ? "AI-generated prompts" : "Prompt set " + set;
-  const title = isMock && ready ? sectionName + " mock" : titles[phase.task - 1];
+  const promptLabel = generated || generating || (ready && useAi) ? "AI-generated prompts" : "Prompt set " + set;
+  const taskTitle = titles[phase.task - 1];
+  const title = writingTask ? `Writing Task ${phase.task}: ${taskTitle}`
+    : isMock && ready ? sectionName + " mock" : taskTitle;
   const taskProgress = "Task " + phase.task + " of " + titles.length;
   const timer = (
-    <div className={(isMock ? "mock-clock" : "timer-bar") + (phase.name === "record" ? " recording" : "")}>
+    <div className={(showToolbar ? "mock-clock" : "timer-bar") + (phase.name === "record" ? " recording" : "")}>
       <span role="status">{phaseLabels[phase.name]}</span>
       {clock && <time role="timer" aria-label="Time remaining">{formatTime(remaining)}</time>}
     </div>
   );
   const validTiming = [customPrep, customResponse].every(Number.isInteger) &&
     customPrep >= 1 && customPrep <= 300 && customResponse >= 1 && customResponse <= 300;
+  const taskNav = !isMock && (
+    <nav className="task-nav" aria-label={skill + " tasks"}>
+      {titles.map((taskTitle, index) => (
+        <Link key={taskTitle} aria-label={"Task " + (index + 1) + " · " + taskTitle} aria-current={phase.task === index + 1 ? "page" : undefined} to={"/" + skill + "/" + (index + 1) + (generated || useAi ? "" : "?set=" + set)}>{index + 1}</Link>
+      ))}
+    </nav>
+  );
 
   return (
-    <main className={isMock ? "mock-page" : "page practice-page"} id="main">
-      {isMock ? (
-        <header className="mock-toolbar" role="group" aria-label="Mock test controls">
-          <div className="mock-width mock-toolbar-inner">
+    <main className={`${isMock ? "mock-page" : "page practice-page"}${writingTask ? " writing-task-page" : ""}`} id="main">
+      {showToolbar ? (
+        <header className="mock-toolbar" role="group" aria-label={isMock ? "Mock test controls" : "Writing task controls"}>
+          <div className={isMock ? "mock-width mock-toolbar-inner" : "mock-toolbar-inner"}>
             <div className="mock-title">
-              <p>
+              {!writingTask && <p>
                 {ready ? "CELPIP Practice" : sectionName + " mock"}
                 {!ready && <><span aria-hidden="true">/</span><span>{taskProgress}</span></>}
-              </p>
+              </p>}
               <h1 ref={heading} tabIndex={-1}>{title}</h1>
             </div>
             {!ready && (
@@ -342,9 +368,9 @@ export default function Practice({ skill, mode, firstTask, initialSet, initialAi
                 {phase.name === "select" && (
                   <button type="button" className="button mock-next" onClick={startPreparation}>Next <span aria-hidden="true">→</span></button>
                 )}
-                {phase.name === "write" && (
-                  <button type="button" className="button mock-next" onClick={finishTask}>
-                    {lastTask ? "Finish section" : "Next task"}<span aria-hidden="true"> →</span>
+                {writingTask && (
+                  <button type="button" className="button mock-next" onClick={finishTask} disabled={phase.name !== "write"}>
+                    {isMock ? (lastTask ? "Finish section" : "Next task") : "Finish writing"}<span aria-hidden="true"> →</span>
                   </button>
                 )}
               </div>
@@ -359,11 +385,7 @@ export default function Practice({ skill, mode, firstTask, initialSet, initialAi
           </div>
           <h1 ref={heading} tabIndex={-1}>{title}</h1>
           <div className="practice-meta"><span>{taskProgress}</span><span>{promptLabel}</span></div>
-          <nav className="task-nav" aria-label={skill + " tasks"}>
-            {titles.map((taskTitle, index) => (
-              <Link key={taskTitle} aria-label={"Task " + (index + 1) + " · " + taskTitle} aria-current={phase.task === index + 1 ? "page" : undefined} to={"/" + skill + "/" + (index + 1) + (generated || useAi ? "" : "?set=" + set)}>{index + 1}</Link>
-            ))}
-          </nav>
+          {taskNav}
         </>
       )}
 
@@ -412,23 +434,41 @@ export default function Practice({ skill, mode, firstTask, initialSet, initialAi
             {aiMessage && <p className="notice" role="alert">{aiMessage} You can also choose a built-in set.</p>}
             {mode === "drill" && skill === "speaking" && firstTask === 5 && <p className="muted">The option selection has its own 60-second timer.</p>}
             {skill === "speaking" && <p className="muted">Have your microphone ready. The app checks access before starting the timer.</p>}
-            <button type="button" className="button primary" onClick={startSession} disabled={pending || (useAi && (!ai.available || !ai.ready || !ai.eligible)) || (mode === "drill" && skill === "speaking" && !validTiming)}>
+            <button type="button" className="button primary" onClick={startSession} disabled={pending || (useAi && (!ai.available || !ai.user)) || (mode === "drill" && skill === "speaking" && !validTiming)}>
               {pending ? useAi ? "Generating prompts…" : "Checking microphone…" : mode === "mock" ? "Start mock" : "Show prompt and start"}
             </button>
           </section>
+        ) : writingTask ? (
+          <>
+            <WritingWorkspace
+              key={phase.task}
+              prompt={prompt}
+              loading={generating}
+              exam={isMock}
+              editor={editor}
+              text={response?.text ?? ""}
+              readOnly={phase.name !== "write"}
+              onChange={changeWriting}
+            />
+            <div className="mock-session-footer">
+              <span>{promptLabel}</span>
+              {isMock ? (generating ?
+                <button type="button" className="button secondary" onClick={cancelGeneration}>Back to setup</button> :
+                <button type="button" className="button secondary" onClick={exitMock} disabled={phase.name === "saving"}>End mock</button>) :
+                <Link className="back-link" to="/">← Practice home</Link>}
+            </div>
+            {taskNav}
+          </>
         ) : (
           <>
             {!isMock && timer}
-            <div className={isMock ? "mock-workspace mock-" + skill : skill === "writing" ? "practice-grid" : undefined}>
+            <div className={isMock ? "mock-workspace mock-speaking" : undefined}>
               <section className="card prompt">
                 <h2>{phase.name === "select" ? "Part 1 · Select an option" : phase.task === 5 ? "Part 2 · Make your case" : "Prompt"}</h2>
                 {prompt ? <PromptView prompt={prompt} choice={response?.choice} selecting={phase.name === "select"} onChoose={chooseOption} />
                   : <p className="muted">The saved prompt is unavailable.</p>}
               </section>
-              {skill === "writing" && (
-                <WritingEditor key={phase.task} editor={editor} text={response?.text ?? ""} readOnly={phase.name !== "write"} onChange={changeWriting} />
-              )}
-              {isMock && skill === "speaking" && <SpeakingSchedule task={phase.task} phase={phase.name} />}
+              {isMock && <SpeakingSchedule task={phase.task} phase={phase.name} />}
             </div>
             {isMock ? (
               <div className="mock-session-footer">
@@ -438,13 +478,12 @@ export default function Practice({ skill, mode, firstTask, initialSet, initialAi
             ) : (
               <div className="actions practice-actions">
                 {phase.name === "select" && <button type="button" className="button primary" onClick={startPreparation}>Continue to comparison</button>}
-                {phase.name === "write" && <button type="button" className="button primary" onClick={finishTask}>Finish writing</button>}
                 {phase.name === "record" && <button type="button" className="button primary" onClick={finishTask}>Finish recording</button>}
               </div>
             )}
           </>
         )}
-        {!isMock && <NoisePlayer />}
+        {(!isMock || skill === "writing") && <NoisePlayer floating={skill === "writing"} />}
       </div>
     </main>
   );

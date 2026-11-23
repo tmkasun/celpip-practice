@@ -75,7 +75,7 @@ export default function WritingAiReview({ session, selected, save }: {
         {answers.length > 1 ? "Tasks " : "Task "}{taskList} will be sent to Google with the prompts when you request feedback.
       </p>
       <WritingAiControls disabled={pending} />
-      <button type="button" className="button primary" onClick={requestFeedback} disabled={pending || !ai.eligible}>
+      <button type="button" className="button primary" onClick={requestFeedback} disabled={pending || !ai.user}>
         {pending ? "Getting AI feedback…" : "Get AI feedback"}
       </button>
       {pending && <p className="muted" role="status">Gemini is reviewing your Writing response{answers.length > 1 ? "s" : ""}.</p>}

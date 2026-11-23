@@ -20,21 +20,15 @@ function Home() {
       </section>
       <div className="home-grid">
         <section className="card skill-card">
-          <div className="skill-heading"><h2>Writing</h2><span>53 min</span></div>
-          <p>Write an email and respond to a survey. Review both drafts against CELPIP’s criteria.</p>
-          <div className="actions">
-            <Link className="button primary" to="/mock/writing">Start Writing mock</Link>
-            <Link className="button secondary" to="/mock/writing?source=ai">AI-generated</Link>
-            <Link className="text-link" to="/writing/1">Drill a Writing task <span aria-hidden="true">→</span></Link>
+          <div className="skill-heading">
+            <h2>Writing</h2>
+            <span>AI mock available</span>
           </div>
+          <Link className="button primary" to="/writing/1">Start Writing mock</Link>
         </section>
         <section className="card skill-card">
-          <div className="skill-heading"><h2>Speaking</h2><span>About 15 min</span></div>
-          <p>Work through all eight tasks with timed preparation and recording, then listen back.</p>
-          <div className="actions">
-            <Link className="button primary" to="/mock/speaking">Start Speaking mock</Link>
-            <Link className="text-link" to="/speaking/1">Drill a Speaking task <span aria-hidden="true">→</span></Link>
-          </div>
+          <div className="skill-heading"><h2>Speaking</h2></div>
+          <Link className="button primary" to="/speaking/1">Start Speaking mock</Link>
         </section>
         <section className="card skill-card resource-card">
           <div className="skill-heading"><h2>Listening</h2><span>46–55 min</span></div>

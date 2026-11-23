@@ -11,7 +11,7 @@ async function main() {
         expectedLevel > 12 || (index > 0 && expectedLevel <= references[index - 1].expectedLevel))) {
     throw new Error("Provide three reference attempts in ascending official level order.");
   }
-  const inputs = references.map(({ answers }) => parseRequest("feedback", { eligible: true, answers }));
+  const inputs = references.map(({ answers }) => parseRequest("feedback", { answers }));
   if (inputs.some(({ tasks }) => tasks.length !== 2)) throw new Error("Each reference attempt must contain both tasks.");
 
   const run = createGemini({

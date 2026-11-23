@@ -3,6 +3,8 @@ const { once } = require("node:events");
 const { test } = require("node:test");
 const { createApp } = require("./index.cjs");
 const { createQuota } = require("./quota.cjs");
+const { createQuestionBank } = require("./question-bank.cjs");
+const { memoryFirestore } = require("./test-support/firestore.cjs");
 const { createGemini, parseRequest, WritingError } = require("./writing.cjs");
 
 const email = {
@@ -59,7 +61,7 @@ test("generates both tasks in one structured, authenticated Google request", asy
     assert.deepEqual(request.generationConfig.responseJsonSchema.required, ["task1", "task2"]);
     return providerResponse({ task1: email, task2: survey });
   });
-  const { prompts } = await run("prompts", parseRequest("prompts", { eligible: true, tasks: [2, 1] }));
+  const { prompts } = await run("prompts", parseRequest("prompts", { tasks: [2, 1] }));
   assert.equal(calls, 1);
   assert.equal(prompts[0].prompt.instruction, "Write an email to the building manager in about 150–200 words.");
   assert.deepEqual(prompts[1].prompt.points, ["Option A — Add raised garden beds.", "Option B — Build a covered seating area."]);
@@ -74,7 +76,7 @@ test("uses the exact submissions, counts words and keeps only authentic excerpts
     assert.deepEqual(submitted, answers.map((item) => ({ ...item, wordCount: 10 })));
     return providerResponse({ task1: taskFeedback, task2: { ...taskFeedback, level: 8 }, overallLevel: 8 });
   });
-  const result = await run("feedback", parseRequest("feedback", { eligible: true, answers }));
+  const result = await run("feedback", parseRequest("feedback", { answers }));
   assert.deepEqual(result.tasks.map(({ task, level }) => ({ task, level })), [{ task: 1, level: 7 }, { task: 2, level: 8 }]);
   assert.equal(result.overallLevel, 8);
   assert.equal(result.tasks[0].criteria.contentCoherence.excerpt, criterion.excerpt);
@@ -83,9 +85,8 @@ test("uses the exact submissions, counts words and keeps only authentic excerpts
 });
 
 test("rejects invalid input and classifies quota, depleted prepaid billing and invalid provider output", async () => {
-  assert.throws(() => parseRequest("prompts", { eligible: true, tasks: [2, 2] }), { code: "invalid_input" });
-  assert.throws(() => parseRequest("feedback", { eligible: true, answers: [{ ...answer, text: "   " }] }), { code: "invalid_input" });
-  assert.throws(() => parseRequest("feedback", { eligible: false, answers: [answer] }), { code: "ineligible" });
+  assert.throws(() => parseRequest("prompts", { tasks: [2, 2] }), { code: "invalid_input" });
+  assert.throws(() => parseRequest("feedback", { answers: [{ ...answer, text: "   " }] }), { code: "invalid_input" });
 
   const input = { tasks: [1] };
   const cases = [
@@ -137,27 +138,6 @@ test("keeps generation, quota and billing errors on their original request path"
   }
 });
 
-function memoryFirestore() {
-  const data = new Map();
-  let priorTransaction = Promise.resolve();
-  return {
-    collection: (collection) => ({ doc: (id) => collection + "/" + id }),
-    runTransaction(callback) {
-      const next = priorTransaction.then(async () => {
-        const writes = new Map();
-        const result = await callback({
-          getAll: async (...keys) => keys.map((key) => ({ data: () => data.get(key) })),
-          set: (key, value) => writes.set(key, value),
-        });
-        for (const [key, value] of writes) data.set(key, value);
-        return result;
-      });
-      priorTransaction = next.catch(() => undefined);
-      return next;
-    },
-  };
-}
-
 test("reserves shared quota under concurrent requests and resets the day in Pacific time", async () => {
   let now = Date.parse("2026-11-23T07:59:30Z");
   const reserve = createQuota(memoryFirestore(), { accountDaily: 2, minute: 3, daily: 4 }, () => now);
@@ -173,7 +153,7 @@ test("reserves shared quota under concurrent requests and resets the day in Paci
   await assert.rejects(reserve("c"), { code: "daily_limit" });
 });
 
-test("verifies Google sign-in and reserves quota before sending eligible work to Gemini", async (t) => {
+test("verifies Google sign-in and reserves quota before sending writing to Gemini", async (t) => {
   const firebase = { projectId: "test-project", apiKey: "public-firebase-api-key" };
   const calls = [];
   const app = createApp({
@@ -197,17 +177,16 @@ test("verifies Google sign-in and reserves quota before sending eligible work to
   const config = await fetch(url + "/api/writing/config");
   assert.deepEqual(await config.json(), { firebase });
   assert.equal(config.headers.get("cache-control"), "no-store");
-  async function post(token, eligible = true) {
+  async function post(token) {
     const response = await fetch(url + "/api/writing/feedback", {
       method: "POST",
       headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-      body: JSON.stringify({ eligible, answers: [answer] }),
+      body: JSON.stringify({ answers: [answer] }),
     });
     return [response.status, await response.json()];
   }
   assert.deepEqual(await post("expired"), [401, { error: "sign_in" }]);
   assert.deepEqual(await post("not-google"), [401, { error: "sign_in" }]);
-  assert.deepEqual(await post("valid", false), [403, { error: "ineligible" }]);
   assert.deepEqual(calls, []);
   assert.deepEqual(await post("valid"), [200, { tasks: [{ task: 1, ...taskFeedback }] }]);
   assert.deepEqual(calls, ["quota", "gemini"]);
@@ -215,6 +194,7 @@ test("verifies Google sign-in and reserves quota before sending eligible work to
 
 test("quota errors fail closed and send a retry interval", async (t) => {
   const app = createApp({
+    questionBank: createQuestionBank(memoryFirestore()),
     firebase: { projectId: "test-project" },
     verifyIdToken: async (token) => ({ uid: token, email_verified: true, firebase: { sign_in_provider: "google.com" } }),
     reserve: async (uid) => {
@@ -230,7 +210,7 @@ test("quota errors fail closed and send a retry interval", async (t) => {
   const request = (token) => fetch("http://127.0.0.1:" + server.address().port + "/api/writing/prompts", {
     method: "POST",
     headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-    body: JSON.stringify({ eligible: true, tasks: [1, 2] }),
+    body: JSON.stringify({ tasks: [1, 2] }),
   });
   const response = await request("test");
   assert.equal(response.status, 429);
