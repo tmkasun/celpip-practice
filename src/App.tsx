@@ -2,8 +2,9 @@ import { useCallback, useRef, useState } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useMatch, useParams, useSearchParams } from "react-router-dom";
 import Practice from "./Practice";
 import Review, { History } from "./Review";
-import { loadSessions, saveAudio, saveSession, type Session } from "./practiceStorage";
+import { loadSessions, saveAudio, saveSession, writingDraftUrl, type Session } from "./practiceStorage";
 import { taskTitles, type Skill } from "./questions/pool";
+import { WritingAiProvider } from "./components/WritingAiAccess";
 import "./App.css";
 
 const officialPractice = "https://www.celpip.ca/free-practice-tests/";
@@ -23,6 +24,7 @@ function Home() {
           <p>Write an email and respond to a survey. Review both drafts against CELPIP’s criteria.</p>
           <div className="actions">
             <Link className="button primary" to="/mock/writing">Start Writing mock</Link>
+            <Link className="button secondary" to="/mock/writing?source=ai">AI-generated</Link>
             <Link className="text-link" to="/writing/1">Drill a Writing task <span aria-hidden="true">→</span></Link>
           </div>
         </section>
@@ -64,51 +66,63 @@ function PracticeRoute({ skill, mode, sessions, save, keepAudio }: PracticeData 
   const requestedSet = search.get("set");
   const set = requestedSet === "2" ? 2 : 1;
   const hasRequestedSet = requestedSet === "1" || requestedSet === "2";
+  const openGeneratedSetup = search.get("source") === "ai" && skill === "writing";
+  const requestedDraft = search.get("draft");
   const task = mode === "mock" ? 1 : Number(taskId);
   if (!Number.isInteger(task) || task < 1 || task > taskTitles[skill].length) {
     return <Navigate replace to={"/" + skill + "/1"} />;
   }
 
-  const draft = mode === "drill" && skill === "writing" ? sessions.find((session) =>
+  const draft = mode === "drill" && skill === "writing" && !openGeneratedSetup ? sessions.find((session) =>
     session.status === "active" && session.skill === skill && session.mode === mode &&
-    session.responses[0]?.task === task && (!hasRequestedSet || session.set === set)
+    session.responses[0]?.task === task &&
+    (requestedDraft ? session.id === requestedDraft : !hasRequestedSet || (!session.writingPrompts && session.set === set))
   ) : undefined;
 
   return <Practice
-    key={mode + "-" + skill + "-" + task + "-" + set}
-    skill={skill} mode={mode} firstTask={task} initialSet={set} draft={draft} save={save} keepAudio={keepAudio}
+    key={JSON.stringify([mode, skill, task, set, hasRequestedSet, openGeneratedSetup, requestedDraft])}
+    skill={skill} mode={mode} firstTask={task} initialSet={set} initialAi={openGeneratedSetup} draft={draft} save={save} keepAudio={keepAudio}
   />;
 }
 
-function ReviewRoute({ sessions, save, getMemoryAudio }: {
+function ReviewRoute({ sessions, update, getMemoryAudio }: {
   sessions: Session[];
-  save: (session: Session) => void;
+  update: (id: string, change: (current: Session) => Session) => void;
   getMemoryAudio: (key: string) => Blob | undefined;
 }) {
   const { sessionId } = useParams();
   const session = sessions.find((item) => item.id === sessionId);
   if (!session) return <Navigate replace to="/review" />;
-  if (session.status === "active") return <Navigate replace to={session.mode === "drill" && session.skill === "writing" ? "/writing/" + session.responses[0].task + "?set=" + session.set : "/review"} />;
-  return <Review key={session.id} session={session} save={save} getMemoryAudio={getMemoryAudio} />;
+  if (session.status === "active") return <Navigate replace to={session.mode === "drill" && session.skill === "writing" ? writingDraftUrl(session) : "/review"} />;
+  return <Review key={session.id} session={session} update={(change) => update(session.id, change)} getMemoryAudio={getMemoryAudio} />;
 }
 
 export default function App() {
   const isMockPage = Boolean(useMatch("/mock/:skill"));
   const [sessions, setSessions] = useState(loadSessions);
+  const currentSessions = useRef(sessions);
   const [storageError, setStorageError] = useState(false);
   const memoryAudio = useRef(new Map<string, Blob>());
 
   const save = useCallback((session: Session) => {
-    setSessions((items) => {
-      const index = items.findIndex((item) => item.id === session.id);
-      return index === -1 ? [session, ...items] : items.map((item, position) => position === index ? session : item);
-    });
+    const items = currentSessions.current;
+    currentSessions.current = items.some((item) => item.id === session.id)
+      ? items.map((item) => item.id === session.id ? session : item)
+      : [session, ...items];
+    setSessions(currentSessions.current);
     try {
       saveSession(session);
     } catch {
       setStorageError(true);
     }
   }, []);
+
+  const update = useCallback((id: string, change: (current: Session) => Session) => {
+    const current = currentSessions.current.find((item) => item.id === id);
+    if (!current) return;
+    const next = change(current);
+    if (next !== current) save(next);
+  }, [save]);
 
   const keepAudio = useCallback((key: string, blob: Blob) => {
     memoryAudio.current.set(key, blob);
@@ -118,7 +132,7 @@ export default function App() {
 
   const data = { sessions, save, keepAudio };
   return (
-    <>
+    <WritingAiProvider>
       <a className="skip-link" href="#main">Skip to content</a>
       {!isMockPage && <header className="site-header">
         <div className="header-inner">
@@ -136,10 +150,10 @@ export default function App() {
         <Route path="/mock/writing" element={<PracticeRoute {...data} skill="writing" mode="mock" />} />
         <Route path="/mock/speaking" element={<PracticeRoute {...data} skill="speaking" mode="mock" />} />
         <Route path="/review" element={<History sessions={sessions.filter((item) => item.status !== "active" || (item.mode === "drill" && item.skill === "writing"))} />} />
-        <Route path="/review/:sessionId" element={<ReviewRoute sessions={sessions} save={save} getMemoryAudio={getMemoryAudio} />} />
+        <Route path="/review/:sessionId" element={<ReviewRoute sessions={sessions} update={update} getMemoryAudio={getMemoryAudio} />} />
         <Route path="*" element={<Navigate replace to="/" />} />
       </Routes>
       {!isMockPage && <footer className="site-footer"><span>Independent CELPIP practice</span><a href="https://www.celpip.ca/test-format-scoring/" target="_blank" rel="noreferrer">Official test format and scoring ↗</a></footer>}
-    </>
+    </WritingAiProvider>
   );
 }

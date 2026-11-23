@@ -2,27 +2,32 @@
   "name": "celpip",
   "version": "0.1.0",
   "private": true,
+  "proxy": "http://127.0.0.1:8080",
+  "engines": {
+    "node": ">=22.9"
+  },
   "dependencies": {
-    "@testing-library/jest-dom": "^5.17.0",
-    "@testing-library/react": "^13.4.0",
-    "@testing-library/user-event": "^13.5.0",
-    "@types/jest": "^27.5.2",
-    "@types/node": "^16.18.101",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
+    "@dataconnect/admin-generated": "file:src/dataconnect-admin-generated",
+    "@dataconnect/generated": "file:src/dataconnect-generated",
+    "ajv": "^8.20.0",
+    "express": "^5.3.0",
+    "firebase": "^13.4.0",
+    "firebase-admin": "^14.5.1",
+    "nspell": "^2.1.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router": "^6.24.0",
     "react-router-dom": "^6.24.0",
-    "react-scripts": "5.0.1",
-    "typescript": "^4.9.5",
     "use-sound": "^4.0.3",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "serve": "node --env-file-if-exists=.env.server server/index.cjs",
     "test": "react-scripts test",
+    "test:server": "node --test server/*.test.cjs",
+    "test:writing:live": "node --env-file-if-exists=.env.server server/check-writing.cjs",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -44,7 +49,17 @@
     ]
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
     "@types/howler": "^2.2.11",
-    "@types/webrtc": "^0.0.43"
+    "@types/jest": "^27.5.2",
+    "@types/node": "^16.18.101",
+    "@types/nspell": "^2.1.6",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/webrtc": "^0.0.43",
+    "react-scripts": "5.0.1",
+    "typescript": "^4.9.5"
   }
 }

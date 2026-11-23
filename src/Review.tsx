@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import PromptView, { promptText } from "./components/PromptView";
 import WordCount from "./components/WordCount";
-import { audioKey, downloadResponse, loadAudio, loadLegacyAudio, type Response, type Session } from "./practiceStorage";
-import { getPrompt, taskTitles, type Skill } from "./questions/pool";
+import WritingAiReview from "./components/WritingAiReview";
+import { audioKey, downloadResponse, getSessionPrompt, loadAudio, loadLegacyAudio, promptSetLabel, writingDraftUrl, type Response, type Session } from "./practiceStorage";
+import { taskTitles, type Skill } from "./questions/pool";
 
 const criteria = {
   writing: [
@@ -94,19 +95,18 @@ function CheckList({ skill, response, save }: {
   );
 }
 
-function ReviewResponse({ session, response, save, getMemoryAudio }: {
+function ReviewResponse({ session, response, getMemoryAudio }: {
   session: Session;
   response: Response;
-  save: (session: Session) => void;
   getMemoryAudio: (key: string) => Blob | undefined;
 }) {
   const { skill, set } = session;
   const { task, text } = response;
-  const prompt = getPrompt(skill, set, task);
+  const prompt = getSessionPrompt(session, task);
   const title = taskTitles[skill][task - 1];
-  const fileName = "celpip-" + skill + "-task-" + task + "-set-" + set;
+  const fileName = "celpip-" + skill + "-task-" + task + (session.writingPrompts ? "-ai" : "-set-" + set);
   const [copyStatus, setCopyStatus] = useState("");
-  const shareText = ["CELPIP practice · " + title, promptText(prompt), "My response\n" + text].join("\n\n");
+  const shareText = ["CELPIP practice · " + title, prompt ? promptText(prompt) : "Saved prompt unavailable", "My response\n" + text].join("\n\n");
 
   async function copy() {
     try {
@@ -118,43 +118,34 @@ function ReviewResponse({ session, response, save, getMemoryAudio }: {
   }
 
   return (
-    <>
-      <div className="review-grid">
-        <section className="card">
-          <h2>{title}</h2>
-          <PromptView prompt={prompt} choice={response.choice} selecting={Boolean(prompt.comparison && response.choice === undefined)} />
-        </section>
-        <section className="card review-answer">
-          <h2>{response.finished ? "Your response" : "Unfinished response"}</h2>
-          {skill === "writing" && text && (
-            <>
-              <p className="written-answer">{text}</p>
-              <WordCount text={text} />
-              <div className="actions">
-                <button type="button" className="button primary" onClick={copy}>Copy prompt and response</button>
-                <button type="button" className="button secondary" onClick={() =>
-                  downloadResponse(new Blob([shareText], { type: "text/plain" }), fileName + ".txt")
-                }>Download text</button>
-              </div>
-              <p className="copy-status" role="status">{copyStatus}</p>
-            </>
-          )}
-          {skill === "speaking" && response.hasAudio && <Recording
-            recordingKey={audioKey(session.id, task)} getMemoryAudio={getMemoryAudio} fileName={fileName}
-          />}
-          {skill === "writing" && !text && <p className="muted">This task has no saved text.</p>}
-          {skill === "speaking" && !response.hasAudio && <p className="muted">This task has no saved recording.</p>}
-        </section>
-      </div>
-      <CheckList skill={skill} response={response} save={(changes) => save({
-        ...session,
-        responses: session.responses.map((item) => item.task === task ? { ...item, ...changes } : item),
-      })} />
-      <div className="actions">
-        <Link className="button secondary" to={"/" + skill + "/" + task + "?set=" + set}>Practice this task</Link>
-        <Link className="button secondary" to={"/" + skill + "/" + task + "?set=" + (set === 1 ? 2 : 1)}>Try the other prompt</Link>
-      </div>
-    </>
+    <div className="review-grid">
+      <section className="card">
+        <h2>{title}</h2>
+        {prompt ? <PromptView prompt={prompt} choice={response.choice} selecting={Boolean(prompt.comparison && response.choice === undefined)} />
+          : <p className="muted">The saved prompt is unavailable.</p>}
+      </section>
+      <section className="card review-answer">
+        <h2>{response.finished ? "Your response" : "Unfinished response"}</h2>
+        {skill === "writing" && text && (
+          <>
+            <p className="written-answer">{text}</p>
+            <WordCount text={text} />
+            <div className="actions">
+              <button type="button" className="button primary" onClick={copy}>Copy prompt and response</button>
+              <button type="button" className="button secondary" onClick={() =>
+                downloadResponse(new Blob([shareText], { type: "text/plain" }), fileName + ".txt")
+              }>Download text</button>
+            </div>
+            <p className="copy-status" role="status">{copyStatus}</p>
+          </>
+        )}
+        {skill === "speaking" && response.hasAudio && <Recording
+          recordingKey={audioKey(session.id, task)} getMemoryAudio={getMemoryAudio} fileName={fileName}
+        />}
+        {skill === "writing" && !text && <p className="muted">This task has no saved text.</p>}
+        {skill === "speaking" && !response.hasAudio && <p className="muted">This task has no saved recording.</p>}
+      </section>
+    </div>
   );
 }
 
@@ -184,9 +175,9 @@ export function History({ sessions }: { sessions: Session[] }) {
           <Link
             className="history-row"
             key={session.id}
-            to={session.status === "active" ? "/writing/" + session.responses[0].task + "?set=" + session.set : "/review/" + session.id}
+            to={session.status === "active" ? writingDraftUrl(session) : "/review/" + session.id}
           >
-            <div><strong>{sessionName(session)}</strong><span>{sessionDate(session)} · Set {session.set}</span></div>
+            <div><strong>{sessionName(session)}</strong><span>{sessionDate(session)} · {promptSetLabel(session)}</span></div>
             <span className={"history-status " + session.status}>{session.status === "active" ? "Resume draft" : session.status === "interrupted" ? "Interrupted" : "Review"} <span aria-hidden="true">→</span></span>
           </Link>
         ))}
@@ -207,18 +198,20 @@ export function History({ sessions }: { sessions: Session[] }) {
   );
 }
 
-export default function Review({ session, save, getMemoryAudio }: {
+export default function Review({ session, update, getMemoryAudio }: {
   session: Session;
-  save: (session: Session) => void;
+  update: (change: (current: Session) => Session) => void;
   getMemoryAudio: (key: string) => Blob | undefined;
 }) {
   const [selected, setSelected] = useState(session.responses[0]?.task);
   const response = session.responses.find((item) => item.task === selected);
+  const { skill, set, writingPrompts } = session;
+  const taskUrl = "/" + skill + "/" + selected;
   return (
     <main className="page" id="main">
       <Link className="back-link" to="/review">← All attempts</Link>
       <h1>{sessionName(session)} review</h1>
-      <p className="lede">Set {session.set} · {sessionDate(session)}{session.status === "interrupted" ? " · Interrupted" : ""}</p>
+      <p className="lede">{promptSetLabel(session)} · {sessionDate(session)}{session.status === "interrupted" ? " · Interrupted" : ""}</p>
       {session.responses.length > 1 && (
         <div className="task-nav" role="group" aria-label="Responses">
           {session.responses.map(({ task }) => (
@@ -226,7 +219,26 @@ export default function Review({ session, save, getMemoryAudio }: {
           ))}
         </div>
       )}
-      {response && <ReviewResponse key={response.task} session={session} response={response} save={save} getMemoryAudio={getMemoryAudio} />}
+      {response && (
+        <>
+          <ReviewResponse key={response.task} session={session} response={response} getMemoryAudio={getMemoryAudio} />
+          {skill === "writing" && (
+            <WritingAiReview session={session} selected={response.task} save={(feedback) => update((current) =>
+              current.writingFeedback ? current : { ...current, writingFeedback: feedback }
+            )} />
+          )}
+          <CheckList skill={skill} response={response} save={(changes) => update((current) => ({
+            ...current,
+            responses: current.responses.map((item) => item.task === response.task ? { ...item, ...changes } : item),
+          }))} />
+          <div className="actions">
+            <Link className="button secondary" to={taskUrl + "?set=" + set}>Practice this task</Link>
+            <Link className="button secondary" to={taskUrl + (writingPrompts ? "?source=ai" : "?set=" + (set === 1 ? 2 : 1))}>
+              {writingPrompts ? "Generate another prompt" : "Try the other prompt"}
+            </Link>
+          </div>
+        </>
+      )}
     </main>
   );
 }

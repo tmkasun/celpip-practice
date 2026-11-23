@@ -49,6 +49,9 @@
 .setup { max-width: 43rem; display: grid; justify-items: start; gap: .95rem; }
 .setup-fields { display: flex; gap: .7rem; flex-wrap: wrap; align-items: end; }
 .setup-fields label { display: grid; gap: .3rem; font-size: .88rem; font-weight: 700; }
+.prompt-choices { min-width: 0; margin: 0; padding: 0; border: 0; }
+.prompt-choices legend { margin-bottom: .3rem; padding: 0; font-size: .88rem; font-weight: 700; }
+.prompt-choices .actions { gap: .5rem; }
 select, input[type="number"], textarea { padding: .58rem .68rem; border: 1px solid #a8bab2; border-radius: .4rem; background: white; color: var(--ink); }
 .setup-fields input { width: 7.7rem; }
 .setup-fields select { min-width: 7rem; }
@@ -74,7 +77,45 @@ label.option-card:has(input:checked) { border-color: var(--accent); background: 
 .option-card img { width: 100%; max-height: 8rem; display: block; object-fit: contain; background: #f5ecde; border-radius: .35rem; }
 .option-card ul { color: var(--muted); font-size: .9rem; }
 .response { display: grid; gap: .7rem; grid-template-rows: auto 1fr auto; }
-.response textarea { width: 100%; min-height: 16.5rem; resize: vertical; line-height: 1.55; }
+.writing-editor { position: relative; min-width: 0; }
+.writing-editor textarea, .writing-underlines {
+  width: 100%;
+  padding: var(--writing-padding, .58rem .68rem);
+  border: 1px solid #a8bab2;
+  font: inherit;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  scrollbar-gutter: stable;
+}
+.writing-editor textarea {
+  display: block;
+  height: 100%;
+  min-height: var(--writing-min-height, 16.5rem);
+  resize: vertical;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.writing-underlines {
+  position: absolute;
+  inset: 0;
+  border-color: transparent;
+  color: transparent;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+.writing-underlines mark {
+  color: inherit;
+  background: none;
+  text-decoration: underline wavy #b42318;
+  text-underline-offset: .16em;
+}
+.writing-footer, .writing-suggestions { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem .65rem; }
+.writing-footer { justify-content: space-between; }
+.writing-spelling { display: grid; gap: .45rem; padding: .65rem; border: 1px solid var(--border); border-radius: .4rem; background: #f5f8f5; overflow-wrap: anywhere; }
+.writing-spelling p { font-size: .88rem; }
+.writing-footer .button, .writing-suggestions .button { padding: .38rem .6rem; font-size: .84rem; }
 .word-count { justify-self: end; color: var(--muted); font-size: .88rem; line-height: 1.4; }
 .word-count strong { color: var(--ink); }
 .word-count.in-range, .word-count.in-range strong { color: var(--accent); }
@@ -95,6 +136,16 @@ audio { max-width: 100%; }
 .written-answer { white-space: pre-wrap; overflow-wrap: anywhere; }
 .copy-status:empty { display: none; }
 .review-checklist { margin-block: .85rem; }
+.ai-review, .ai-access { display: grid; justify-items: start; gap: .65rem; }
+.ai-review { margin-block: .85rem; }
+.ai-review .notice, .ai-access .notice { margin-block: 0; }
+.ai-eligibility { display: flex; align-items: baseline; gap: .5rem; margin-bottom: .25rem; }
+.ai-level { color: var(--accent-dark); font-weight: 750; }
+.ai-criteria { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: .65rem; width: 100%; margin: 0; }
+.ai-criteria > div { border: 1px solid var(--border); border-radius: .5rem; padding: .8rem; }
+.ai-criteria dt { font-weight: 750; }
+.ai-criteria dd { display: grid; gap: .45rem; margin: .35rem 0 0; overflow-wrap: anywhere; }
+.ai-criteria blockquote { border-left: .2rem solid var(--border); padding-left: .6rem; margin: 0; color: var(--muted); }
 .review-checklist > p { margin: .45rem 0 .7rem; }
 .check { display: grid; grid-template-columns: 1.15rem 1fr; gap: .65rem; align-items: baseline; line-height: 1.4; margin-block: .55rem; }
 .check span { display: grid; gap: .2rem; }

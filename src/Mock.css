@@ -143,10 +143,10 @@
 }
 
 .mock-workspace .prompt-body { margin-top: 1rem; }
-.mock-workspace .response { gap: .65rem; }
-.mock-workspace .response textarea {
-  min-height: clamp(17rem, 52vh, 33rem);
-  padding: .85rem;
+.mock-workspace .response {
+  gap: .65rem;
+  --writing-min-height: clamp(17rem, 52vh, 33rem);
+  --writing-padding: .85rem;
 }
 
 .mock-workspace .prompt-image img { max-height: none; }
@@ -200,5 +200,5 @@
   .mock-clock time { font-size: 1.12rem; }
   .mock-content { padding-top: .9rem; }
   .mock-writing, .mock-speaking { grid-template-columns: minmax(0, 1fr); }
-  .mock-workspace .response textarea { min-height: 16rem; }
+  .mock-workspace .response { --writing-min-height: 16rem; }
 }

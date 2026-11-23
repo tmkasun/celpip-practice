@@ -1,4 +1,5 @@
-import type { SetId, Skill } from "./questions/pool";
+import { getPrompt, type Prompt, type SetId, type Skill } from "./questions/pool";
+import type { PromptSnapshot, WritingFeedback } from "./writingAi";
 
 export interface Response {
   task: number;
@@ -19,9 +20,25 @@ export interface Session {
   createdAt: number;
   deadline?: number;
   responses: Response[];
+  writingPrompts?: PromptSnapshot[];
+  writingFeedback?: WritingFeedback;
 }
 
 const sessionPrefix = "celpip-session-";
+
+export function getSessionPrompt(session: Session, task: number): Prompt | undefined {
+  return session.writingPrompts
+    ? session.writingPrompts.find((item) => item.task === task)?.prompt
+    : getPrompt(session.skill, session.set, task);
+}
+
+export function promptSetLabel(session: Session) {
+  return session.writingPrompts ? "AI-generated" : "Set " + session.set;
+}
+
+export function writingDraftUrl(session: Session) {
+  return "/writing/" + session.responses[0]?.task + "?draft=" + encodeURIComponent(session.id);
+}
 
 export function loadSessions(): Session[] {
   try {

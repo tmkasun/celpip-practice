@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { readFileSync } from "fs";
 import { MemoryRouter } from "react-router-dom";
 import App from "./App";
 import { loadSessions } from "./practiceStorage";
@@ -20,8 +21,17 @@ async function advance(seconds: number) {
   });
 }
 
-beforeEach(() => localStorage.clear());
-afterEach(() => jest.useRealTimers());
+beforeEach(() => {
+  localStorage.clear();
+  jest.spyOn(globalThis, "fetch").mockImplementation(async (request) => ({
+    ok: true,
+    text: async () => readFileSync("public" + String(request), "utf8"),
+  }) as Response);
+});
+afterEach(() => {
+  jest.restoreAllMocks();
+  jest.useRealTimers();
+});
 
 test("opens the practice home and connects all four skills to practice", () => {
   open();
@@ -82,6 +92,24 @@ test("recovers a Writing draft with the same prompt and archives an interrupted 
   fireEvent.click(mockHistory);
   expect(screen.getByText("Unfinished mock.")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Copy prompt and response" })).toBeInTheDocument();
+});
+
+test("flags misspellings, accepts regional variants and saves a chosen correction", async () => {
+  const { container } = open("/writing/1");
+  fireEvent.click(screen.getByRole("button", { name: "Show prompt and start" }));
+  const editor = screen.getByRole("textbox", { name: "Your response" });
+  fireEvent.change(editor, { target: { value: "I hope to recieve the color and organise the programme." } });
+  fireEvent.click(screen.getByRole("button", { name: "Spell check" }));
+
+  const suggestion = await screen.findByRole("button", { name: "receive" });
+  expect(Array.from(container.querySelectorAll(".writing-underlines mark"), (mark) => mark.textContent)).toEqual(["recieve"]);
+  fireEvent.click(suggestion);
+
+  const corrected = "I hope to receive the color and organise the programme.";
+  expect(editor).toHaveValue(corrected);
+  expect(editor).toHaveFocus();
+  expect(loadSessions()[0].responses[0].text).toBe(corrected);
+  expect(container.querySelector(".writing-underlines mark")).not.toBeInTheDocument();
 });
 
 test("runs all eight Speaking mock tasks with a shared scene and two-stage comparison", async () => {

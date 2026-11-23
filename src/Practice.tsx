@@ -3,11 +3,13 @@ import { Link, useNavigate } from "react-router-dom";
 import useSound from "use-sound";
 import NoisePlayer from "./components/NoisePlayer";
 import PromptView from "./components/PromptView";
-import WordCount from "./components/WordCount";
+import { useWritingAi, WritingAiControls } from "./components/WritingAiAccess";
+import WritingEditor from "./components/WritingEditor";
 import useCountdown, { formatTime } from "./hooks/useCountdown";
 import useMic from "./hooks/useMic";
-import { audioKey, type Response, type Session } from "./practiceStorage";
-import { getPrompt, speakingTimes, taskTitles, writingSeconds, type SetId, type Skill } from "./questions/pool";
+import { audioKey, getSessionPrompt, type Response, type Session } from "./practiceStorage";
+import { speakingTimes, taskTitles, writingSeconds, type SetId, type Skill } from "./questions/pool";
+import { WritingAiError, type PromptSnapshot, type WritingTask } from "./writingAi";
 import ding from "./sounds/ding.mp3";
 import end from "./sounds/end.mp3";
 import "./Mock.css";
@@ -25,6 +27,7 @@ interface PracticeProps {
   mode: Session["mode"];
   firstTask: number;
   initialSet: SetId;
+  initialAi: boolean;
   draft?: Session;
   save: (session: Session) => void;
   keepAudio: (key: string, blob: Blob) => void;
@@ -83,10 +86,13 @@ function SpeakingSchedule({ task, phase }: { task: number; phase: PhaseName }) {
   );
 }
 
-export default function Practice({ skill, mode, firstTask, initialSet, draft, save, keepAudio }: PracticeProps) {
+export default function Practice({ skill, mode, firstTask, initialSet, initialAi, draft, save, keepAudio }: PracticeProps) {
   const navigate = useNavigate();
+  const ai = useWritingAi();
   const titles = taskTitles[skill];
   const [set, setSet] = useState<SetId>(draft?.set ?? initialSet);
+  const [selectAi, setSelectAi] = useState(initialAi);
+  const useAi = skill === "writing" && selectAi;
   const [session, setSession] = useState(draft);
   const [phase, showPhase] = useState<Phase>(
     draft ? { name: "write", task: firstTask, deadline: draft.deadline } : { name: "ready", task: firstTask }
@@ -95,10 +101,12 @@ export default function Practice({ skill, mode, firstTask, initialSet, draft, sa
   const livePhase = useRef(phase);
   const mounted = useRef(false);
   const requestPending = useRef(false);
+  const generation = useRef<AbortController>();
   const heading = useRef<HTMLHeadingElement>(null);
   const editor = useRef<HTMLTextAreaElement>(null);
   const [pending, setPending] = useState(false);
   const [micMessage, setMicMessage] = useState("");
+  const [aiMessage, setAiMessage] = useState("");
   const [customPrep, setCustomPrep] = useState(speakingTimes[firstTask - 1]?.preparation ?? 30);
   const [customResponse, setCustomResponse] = useState(speakingTimes[firstTask - 1]?.response ?? 60);
   const mic = useMic();
@@ -109,6 +117,7 @@ export default function Practice({ skill, mode, firstTask, initialSet, draft, sa
     mounted.current = true;
     return () => {
       mounted.current = false;
+      generation.current?.abort();
       const current = active.current;
       if (current?.status === "active" && (mode === "mock" || skill === "speaking")) {
         const interrupted: Session = { ...current, status: "interrupted", deadline: undefined };
@@ -128,7 +137,7 @@ export default function Practice({ skill, mode, firstTask, initialSet, draft, sa
     else heading.current?.focus();
   }, [phase.task, focusTarget]);
 
-  const prompt = getPrompt(skill, set, phase.task);
+  const prompt = session && getSessionPrompt(session, phase.task);
   const response = session?.responses.find((item) => item.task === phase.task);
 
   function publish(next: Session) {
@@ -158,8 +167,36 @@ export default function Practice({ skill, mode, firstTask, initialSet, draft, sa
     switchPhase(next);
   }
 
+  function choosePromptSet(choice: SetId | "ai") {
+    setSelectAi(choice === "ai");
+    if (choice !== "ai") setSet(choice);
+    setAiMessage("");
+  }
+
   async function startSession() {
     if (requestPending.current || livePhase.current.name !== "ready") return;
+    let writingPrompts: PromptSnapshot[] | undefined;
+    if (useAi) {
+      if (!ai.available || !ai.eligible) return;
+      const controller = new AbortController();
+      generation.current = controller;
+      requestPending.current = true;
+      setPending(true);
+      setAiMessage("");
+      try {
+        writingPrompts = await ai.generate(mode === "mock" ? [1, 2] : [firstTask as WritingTask], controller.signal);
+        if (controller.signal.aborted) return;
+      } catch (error) {
+        if (mounted.current && !controller.signal.aborted) {
+          setAiMessage(error instanceof WritingAiError ? error.message : "Couldn’t generate a prompt. Try again or choose a built-in set.");
+        }
+        return;
+      } finally {
+        generation.current = undefined;
+        requestPending.current = false;
+        if (mounted.current) setPending(false);
+      }
+    }
     if (skill === "speaking") {
       requestPending.current = true;
       setPending(true);
@@ -182,6 +219,7 @@ export default function Practice({ skill, mode, firstTask, initialSet, draft, sa
       status: "active",
       createdAt: Date.now(),
       responses: [],
+      writingPrompts,
     });
   }
 
@@ -273,6 +311,8 @@ export default function Practice({ skill, mode, firstTask, initialSet, draft, sa
   const lastTask = phase.task === titles.length;
   const isMock = mode === "mock";
   const sectionName = skill === "writing" ? "Writing" : "Speaking";
+  const generated = Boolean(session?.writingPrompts);
+  const promptLabel = generated || (ready && useAi) ? "AI-generated prompts" : "Prompt set " + set;
   const title = isMock && ready ? sectionName + " mock" : titles[phase.task - 1];
   const taskProgress = "Task " + phase.task + " of " + titles.length;
   const timer = (
@@ -318,10 +358,10 @@ export default function Practice({ skill, mode, firstTask, initialSet, draft, sa
             <span className="eyebrow">{skill} / Task drill</span>
           </div>
           <h1 ref={heading} tabIndex={-1}>{title}</h1>
-          <div className="practice-meta"><span>{taskProgress}</span><span>Prompt set {set}</span></div>
+          <div className="practice-meta"><span>{taskProgress}</span><span>{promptLabel}</span></div>
           <nav className="task-nav" aria-label={skill + " tasks"}>
             {titles.map((taskTitle, index) => (
-              <Link key={taskTitle} aria-label={"Task " + (index + 1) + " · " + taskTitle} aria-current={phase.task === index + 1 ? "page" : undefined} to={"/" + skill + "/" + (index + 1) + "?set=" + set}>{index + 1}</Link>
+              <Link key={taskTitle} aria-label={"Task " + (index + 1) + " · " + taskTitle} aria-current={phase.task === index + 1 ? "page" : undefined} to={"/" + skill + "/" + (index + 1) + (generated || useAi ? "" : "?set=" + set)}>{index + 1}</Link>
             ))}
           </nav>
         </>
@@ -339,9 +379,26 @@ export default function Practice({ skill, mode, firstTask, initialSet, draft, sa
                 "The prompt appears when you start the timer. Review your response when you finish."}
             </p>
             <div className="setup-fields">
-              <label>Prompt set<select value={set} onChange={(event) => setSet(Number(event.target.value) as SetId)} disabled={pending}>
-                <option value={1}>Set 1</option><option value={2}>Set 2</option>
-              </select></label>
+              {skill === "writing" ? (
+                <fieldset className="prompt-choices" disabled={pending}>
+                  <legend>Prompt set</legend>
+                  <div className="actions">
+                    {([1, 2, "ai"] as const).map((choice) => {
+                      const selected = choice === (useAi ? "ai" : set);
+                      return (
+                        <button key={choice} type="button" className={"button " + (selected ? "primary" : "secondary")}
+                          aria-pressed={selected} onClick={() => choosePromptSet(choice)}>
+                          {choice === "ai" ? "AI-generated" : "Set " + choice}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              ) : (
+                <label>Prompt set<select value={set} onChange={(event) => setSet(Number(event.target.value) as SetId)} disabled={pending}>
+                  <option value={1}>Set 1</option><option value={2}>Set 2</option>
+                </select></label>
+              )}
               {skill === "speaking" && mode === "drill" && (
                 <>
                   <label>Preparation (sec)<input type="number" value={Number.isNaN(customPrep) ? "" : customPrep} min={1} max={300} onChange={(event) => setCustomPrep(event.target.valueAsNumber)} disabled={pending} /></label>
@@ -349,10 +406,14 @@ export default function Practice({ skill, mode, firstTask, initialSet, draft, sa
                 </>
               )}
             </div>
+            {useAi && (ai.available ? <WritingAiControls disabled={pending} /> : (
+              <p className="muted" role="status">{ai.checking ? "Checking AI availability…" : "AI-generated prompts are unavailable here. Choose a built-in set to continue."}</p>
+            ))}
+            {aiMessage && <p className="notice" role="alert">{aiMessage} You can also choose a built-in set.</p>}
             {mode === "drill" && skill === "speaking" && firstTask === 5 && <p className="muted">The option selection has its own 60-second timer.</p>}
             {skill === "speaking" && <p className="muted">Have your microphone ready. The app checks access before starting the timer.</p>}
-            <button type="button" className="button primary" onClick={startSession} disabled={pending || (mode === "drill" && skill === "speaking" && !validTiming)}>
-              {pending ? "Checking microphone…" : mode === "mock" ? "Start mock" : "Show prompt and start"}
+            <button type="button" className="button primary" onClick={startSession} disabled={pending || (useAi && (!ai.available || !ai.ready || !ai.eligible)) || (mode === "drill" && skill === "speaking" && !validTiming)}>
+              {pending ? useAi ? "Generating prompts…" : "Checking microphone…" : mode === "mock" ? "Start mock" : "Show prompt and start"}
             </button>
           </section>
         ) : (
@@ -361,20 +422,17 @@ export default function Practice({ skill, mode, firstTask, initialSet, draft, sa
             <div className={isMock ? "mock-workspace mock-" + skill : skill === "writing" ? "practice-grid" : undefined}>
               <section className="card prompt">
                 <h2>{phase.name === "select" ? "Part 1 · Select an option" : phase.task === 5 ? "Part 2 · Make your case" : "Prompt"}</h2>
-                <PromptView prompt={prompt} choice={response?.choice} selecting={phase.name === "select"} onChoose={chooseOption} />
+                {prompt ? <PromptView prompt={prompt} choice={response?.choice} selecting={phase.name === "select"} onChoose={chooseOption} />
+                  : <p className="muted">The saved prompt is unavailable.</p>}
               </section>
               {skill === "writing" && (
-                <section className="card response">
-                  <h2><label htmlFor="writing-response">Your response</label></h2>
-                  <textarea id="writing-response" ref={editor} spellCheck value={response?.text ?? ""} onChange={(event) => changeWriting(event.target.value)} readOnly={phase.name !== "write"} />
-                  <WordCount text={response?.text ?? ""} />
-                </section>
+                <WritingEditor key={phase.task} editor={editor} text={response?.text ?? ""} readOnly={phase.name !== "write"} onChange={changeWriting} />
               )}
               {isMock && skill === "speaking" && <SpeakingSchedule task={phase.task} phase={phase.name} />}
             </div>
             {isMock ? (
               <div className="mock-session-footer">
-                <span>Prompt set {set}</span>
+                <span>{promptLabel}</span>
                 <button type="button" className="button secondary" onClick={exitMock} disabled={phase.name === "saving"}>End mock</button>
               </div>
             ) : (

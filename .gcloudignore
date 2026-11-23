@@ -1,0 +1,6 @@
+.gcloudignore
+.git
+.agents
+.aws
+.codex
+#!include:.gitignore
