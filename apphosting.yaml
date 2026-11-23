@@ -16,3 +16,7 @@ env:
     value: "false"
     availability:
       - RUNTIME
+  - variable: GEMINI_API_KEY
+    secret: celpip-gemini-api-key@1
+    availability:
+      - RUNTIME
