@@ -39,11 +39,12 @@ function providerResponse(result, finishReason = "STOP") {
   return Response.json({ candidates: [{ finishReason, content: { parts: [{ text: JSON.stringify(result) }] } }] });
 }
 
-function gemini(fetcher) {
+function gemini(fetcher, gradingFallbackModel) {
   return createGemini({
     apiKey: "test-server-only-key",
     generationModel: "gemini-3.5-flash-lite",
     gradingModel: "gemini-3.8-flash",
+    gradingFallbackModel,
     fetcher,
   });
 }
@@ -97,6 +98,43 @@ test("rejects invalid input and classifies quota, depleted prepaid billing and i
     await assert.rejects(gemini(async () => response)("prompts", input), { status, code });
   }
   await assert.rejects(gemini(async () => { throw new TypeError("Network error"); })("prompts", input), { status: 503, code: "unavailable" });
+});
+
+test("sends the same grading request to the fallback after an unavailable response or timeout", async () => {
+  const failures = [
+    () => Response.json({ error: { status: "UNAVAILABLE" } }, { status: 503 }),
+    () => { throw new DOMException("Gemini timed out", "TimeoutError"); },
+  ];
+  for (const failPrimary of failures) {
+    const requests = [];
+    const run = gemini(async (url, { body }) => {
+      requests.push({ model: new URL(url).pathname.split("/").pop().split(":")[0], body });
+      if (requests.length === 1) return failPrimary();
+      return providerResponse({ task1: taskFeedback });
+    }, "gemini-3.5-flash");
+
+    const result = await run("feedback", { tasks: [1], answers: [answer] });
+    assert.equal(result.tasks[0].level, taskFeedback.level);
+    assert.deepEqual(requests.map(({ model }) => model), ["gemini-3.8-flash", "gemini-3.5-flash"]);
+    assert.equal(requests[0].body, requests[1].body);
+  }
+});
+
+test("keeps generation, quota and billing errors on their original request path", async () => {
+  const cases = [
+    ["prompts", Response.json({}, { status: 503 }), "unavailable"],
+    ["feedback", Response.json({ error: { message: "Prepayment credits are depleted" } }, { status: 503 }), "provider_billing"],
+    ["feedback", Response.json({}, { status: 429 }), "busy"],
+  ];
+  for (const [operation, response, code] of cases) {
+    let calls = 0;
+    const run = gemini(async () => {
+      calls++;
+      return response;
+    }, "gemini-3.5-flash");
+    await assert.rejects(run(operation, { tasks: [1], answers: [answer] }), { code });
+    assert.equal(calls, 1);
+  }
 });
 
 function memoryFirestore() {

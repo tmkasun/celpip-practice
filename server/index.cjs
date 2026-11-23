@@ -26,6 +26,7 @@ function readConfig() {
     apiKey: required("GEMINI_API_KEY"),
     generationModel: process.env.GEMINI_GENERATION_MODEL ?? "gemini-3.5-flash-lite",
     gradingModel: process.env.GEMINI_GRADING_MODEL ?? "gemini-3.8-flash",
+    gradingFallbackModel: process.env.GEMINI_GRADING_FALLBACK_MODEL?.trim(),
     limits: {
       accountDaily: limit("WRITING_AI_ACCOUNT_DAILY", 6),
       minute: limit("WRITING_AI_GLOBAL_MINUTE", 10),

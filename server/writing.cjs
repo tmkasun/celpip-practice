@@ -155,15 +155,18 @@ function providerError(response, payload) {
   return new WritingError(503, "unavailable");
 }
 
-function createGemini({ apiKey, generationModel, gradingModel, fetcher = fetch }) {
+function createGemini({ apiKey, generationModel, gradingModel, gradingFallbackModel, fetcher = fetch }) {
   return async function run(operation, input) {
     const isGeneration = operation === "prompts";
-    const model = isGeneration ? generationModel : gradingModel;
+    const models = [isGeneration ? generationModel : gradingModel];
+    if (!isGeneration && gradingFallbackModel && gradingFallbackModel !== gradingModel) {
+      models.push(gradingFallbackModel);
+    }
     const { schema, valid } = responseFormats[operation][input.tasks.join(",")];
     const data = isGeneration ? input : {
       answers: input.answers.map((answer) => ({ ...answer, wordCount: answer.text.trim().split(/\s+/).length })),
     };
-    const body = {
+    const body = JSON.stringify({
       systemInstruction: { parts: [{ text: isGeneration ? generateInstructions : gradingInstructions }] },
       contents: [{ role: "user", parts: [{ text: JSON.stringify(data) }] }],
       generationConfig: {
@@ -171,22 +174,32 @@ function createGemini({ apiKey, generationModel, gradingModel, fetcher = fetch }
         responseJsonSchema: schema,
         maxOutputTokens: isGeneration ? 2048 : 6144,
       },
-    };
-    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent";
-    let response;
+    });
     let payload;
-    try {
-      response = await fetcher(endpoint, {
-        method: "POST",
-        headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(35000),
-      });
-      payload = await response.json().catch(() => undefined);
-    } catch {
-      throw new WritingError(503, "unavailable");
+    for (const model of models) {
+      const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent";
+      const canFallback = model !== models.at(-1);
+      const signal = AbortSignal.timeout(35000);
+      let response;
+      try {
+        response = await fetcher(endpoint, {
+          method: "POST",
+          headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+          body,
+          signal,
+        });
+        payload = await response.json().catch(() => signal.throwIfAborted());
+      } catch (error) {
+        if (canFallback && (signal.aborted || error?.name === "TimeoutError")) continue;
+        throw new WritingError(503, "unavailable");
+      }
+      if (response.ok) break;
+
+      const error = providerError(response, payload);
+      if (!canFallback || response.status !== 503 || error.code !== "unavailable") {
+        throw error;
+      }
     }
-    if (!response.ok) throw providerError(response, payload);
 
     const candidate = payload?.candidates?.[0];
     if (candidate?.finishReason !== "STOP" || !Array.isArray(candidate.content?.parts)) {

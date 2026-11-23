@@ -18,6 +18,7 @@ async function main() {
     apiKey: process.env.GEMINI_API_KEY,
     generationModel: process.env.GEMINI_GENERATION_MODEL ?? "gemini-3.5-flash-lite",
     gradingModel: process.env.GEMINI_GRADING_MODEL ?? "gemini-3.8-flash",
+    gradingFallbackModel: process.env.GEMINI_GRADING_FALLBACK_MODEL?.trim(),
   });
   console.log(JSON.stringify(await run("prompts", { tasks: [1, 2] }), null, 2));
   const estimates = [];
