@@ -11,6 +11,7 @@ const { memoryFirestore } = require("./test-support/firestore.cjs");
 function prompt(task, version = 1) {
   return {
     task,
+    sampleAnswer: ("Sample for task " + task + " in scenario " + version + ". ").repeat(24).trim(),
     prompt: {
       context: "Scenario " + version + " for task " + task + ".",
       instruction: task === 1 ? "Write an email to the manager." : "Choose an option and explain your reasons.",
@@ -45,13 +46,28 @@ test("persists both generated tasks and shares them across accounts without expo
     assert.equal(stored.sequence, 1);
     assert.deepEqual(stored.createdAt, new Date(1234));
   }
-  assert.deepEqual(account(db, "first-account"), { task1: 1, task2: 1 });
+  assert.deepEqual(account(db, "first-account"), { v2_task1: 1, v2_task2: 1 });
   assert.ok([...db.data.keys()].every((path) => !path.includes("first-account")));
 
   // A fresh service instance uses the same durable bank and history.
   assert.deepEqual(await createQuestionBank(db).getPrompts("other-account", [1, 2], noGeneration), {
     prompts: result.prompts, cacheHits: 2,
   });
+});
+
+test("skips legacy questions and cursors and rejects incomplete new sets atomically", async () => {
+  const db = memoryFirestore();
+  const seen = "writingAiSeen/" + createHash("sha256").update("reader").digest("hex");
+  db.data.set(seen, { task1: 7 });
+  db.data.set("writingAiQuestions/task1/prompts/old", { task: 1, prompt: prompt(1).prompt, sequence: 8 });
+  const bank = createQuestionBank(db);
+  await assert.rejects(bank.getPrompts("reader", [1, 2], async () => ({
+    prompts: [prompt(1), { ...prompt(2), sampleAnswer: "" }],
+  })), { code: "provider_result" });
+  assert.deepEqual(account(db, "reader"), { task1: 7 });
+  assert.equal(questions(db).length, 1);
+  assert.deepEqual((await bank.getPrompts("reader", [1], generator(db).generate)).prompts, [prompt(1)]);
+  assert.deepEqual(account(db, "reader"), { task1: 7, v2_task1: 1 });
 });
 
 test("issues each task oldest first and generates only after that account exhausts the task", async () => {
@@ -67,7 +83,7 @@ test("issues each task oldest first and generates only after that account exhaus
   assert.deepEqual((await bank.getPrompts("reader", [1], generate)).prompts, [prompt(1, 4)]);
   assert.deepEqual(calls, [[1, 2], [1, 2], [1, 2], [1]]);
   assert.deepEqual((await bank.getPrompts("reader", [2], noGeneration)).prompts, [prompt(2)]);
-  assert.deepEqual(account(db, "reader"), { task1: 4, task2: 1 });
+  assert.deepEqual(account(db, "reader"), { v2_task1: 4, v2_task2: 1 });
 });
 
 test("a mock generates only the missing task and claims the cached and generated questions together", async () => {
@@ -81,7 +97,7 @@ test("a mock generates only the missing task and claims the cached and generated
     prompts: [prompt(1, 2), prompt(2, 3)], cacheHits: 1,
   });
   assert.deepEqual(calls, [[1, 2], [1], [2]]);
-  assert.deepEqual(account(db, "reader"), { task1: 2, task2: 2 });
+  assert.deepEqual(account(db, "reader"), { v2_task1: 2, v2_task2: 2 });
 });
 
 test("failed generation or quota reservation leaves both mock cursors unchanged", async () => {
@@ -118,8 +134,8 @@ test("normalizes duplicate output without overwriting questions or advancing seq
   }), { code: "provider_result" });
   assert.equal(attempts, 3);
   assert.deepEqual(questions(db), original);
-  assert.deepEqual(db.data.get("writingAiQuestions/task1"), { lastSequence: 1 });
-  assert.deepEqual(account(db, "reader"), { task1: 1 });
+  assert.deepEqual(db.data.get("writingAiQuestions/v2_task1"), { lastSequence: 1 });
+  assert.deepEqual(account(db, "reader"), { v2_task1: 1 });
   assert.deepEqual((await bank.getPrompts("other", [1], noGeneration)).prompts, [prompt(1)]);
 });
 
@@ -150,7 +166,7 @@ test("concurrent drills and mocks never issue the same task twice to an account"
     assert.equal(issued.length, 3);
     assert.equal(new Set(issued.map((item) => item.prompt.context)).size, 3);
   }
-  assert.deepEqual(account(db, "reader"), { task1: 3, task2: 3 });
+  assert.deepEqual(account(db, "reader"), { v2_task1: 3, v2_task2: 3 });
   assert.equal(calls.length, 4, "transaction retries must not repeat Gemini calls");
   assert.equal(questions(db).length, 8);
 });
@@ -164,7 +180,7 @@ test("simultaneous exhaustion rechecks the bank and preserves generated question
     bank.getPrompts("reader", [1], generate),
   ]);
   assert.equal(new Set(results.map(({ prompts }) => prompts[0].prompt.context)).size, 2);
-  assert.deepEqual(account(db, "reader"), { task1: 2 });
+  assert.deepEqual(account(db, "reader"), { v2_task1: 2 });
   assert.equal(questions(db).length, 2);
   assert.deepEqual((await bank.getPrompts("other", [1], noGeneration)).prompts, [prompt(1)]);
 });

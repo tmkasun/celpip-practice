@@ -6,6 +6,19 @@ import WordCount from "./components/WordCount";
 import WritingAiReview from "./components/WritingAiReview";
 import { audioKey, downloadResponse, getSessionPrompt, loadAudio, loadLegacyAudio, promptSetLabel, writingDraftUrl, type Response, type Session } from "./practiceStorage";
 import { taskTitles, type Skill } from "./questions/pool";
+import { getSampleAnswer } from "./questions/sampleAnswers";
+
+function reviewSample(session: Session, response: Response) {
+  if (session.speakingPrompts) {
+    const saved = session.speakingPrompts.find(item => item.task === response.task);
+    if (response.task === 5) return saved?.sampleAnswersByChoice?.[response.choice ?? 0];
+    return saved?.sampleAnswer;
+  }
+  if (session.writingPrompts) {
+    return session.writingPrompts.find(item => item.task === response.task)?.sampleAnswer;
+  }
+  return getSampleAnswer(session.skill, session.set, response.task, response.choice);
+}
 
 const criteria = {
   writing: [
@@ -77,8 +90,8 @@ function CheckList({ skill, response, save }: {
 }) {
   const checks = response.checks ?? [];
   return (
-    <section className="card review-checklist">
-      <h2>Self-review checklist</h2>
+    <details className="card review-checklist">
+      <summary><h2>Self-review checklist</h2></summary>
       <p className="muted">Use these criteria to review your practice response.</p>
       {criteria[skill].map(([label, description], index) => (
         <label key={label} className="check">
@@ -92,7 +105,7 @@ function CheckList({ skill, response, save }: {
         <textarea rows={2} value={response.note ?? ""} onChange={(event) => save({ note: event.target.value })} />
       </label>
       <a className="text-link" href={scoreChart} target="_blank" rel="noreferrer">Compare official Level 9 and 10 examples ↗</a>
-    </section>
+    </details>
   );
 }
 
@@ -208,6 +221,7 @@ export default function Review({ session, update, getMemoryAudio }: {
   const response = session.responses.find((item) => item.task === selected);
   const { skill, set, writingPrompts } = session;
   const taskUrl = "/" + skill + "/" + selected;
+  const sample = response && reviewSample(session, response);
   return (
     <main className="page" id="main">
       <Link className="back-link" to="/review">← All attempts</Link>
@@ -223,6 +237,12 @@ export default function Review({ session, update, getMemoryAudio }: {
       {response && (
         <>
           <ReviewResponse key={response.task} session={session} response={response} getMemoryAudio={getMemoryAudio} />
+          {sample && (
+            <section className="card review-sample">
+              <h2>Sample answer</h2>
+              <p className="written-answer">{sample}</p>
+            </section>
+          )}
           {skill === "writing" && (
             <WritingAiReview session={session} selected={response.task} save={(feedback) => update((current) =>
               current.writingFeedback ? current : { ...current, writingFeedback: feedback }
@@ -230,12 +250,12 @@ export default function Review({ session, update, getMemoryAudio }: {
           )}
           {skill === "speaking" && <SpeakingAiReview session={session} selected={selected} getMemoryAudio={getMemoryAudio} save={speakingFeedback => update(current => ({...current, speakingFeedback}))}/>}
           {skill === "speaking" && selected === 3 && <Link className="button secondary" to={"/speaking/4?" + (session.speakingPrompts ? "source=ai&scene=" + encodeURIComponent(session.id) : "set=" + set)}>Practice Task 4 with this picture</Link>}
-          <CheckList skill={skill} response={response} save={(changes) => update((current) => ({
+          <CheckList key={"checklist-" + response.task} skill={skill} response={response} save={(changes) => update((current) => ({
             ...current,
             responses: current.responses.map((item) => item.task === response.task ? { ...item, ...changes } : item),
           }))} />
           <div className="actions">
-            <Link className="button secondary" to={taskUrl + "?set=" + set}>Practice this task</Link>
+            <Link className="button secondary" to={taskUrl + "?set=" + set}>Back</Link>
             <Link className="button secondary" to={taskUrl + (writingPrompts || session.speakingPrompts ? "?source=ai" : "?set=" + (set === 1 ? 2 : 1))}>
               {writingPrompts || session.speakingPrompts ? "Generate another prompt" : "Try the other prompt"}
             </Link>

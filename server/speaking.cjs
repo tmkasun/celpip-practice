@@ -25,6 +25,13 @@ const assert = (condition, status = 502) => {
 };
 const string = (value) => typeof value === "string" && value.trim() && value.length <= 1800;
 const level = (value) => Number.isInteger(value) && value >= 0 && value <= 12;
+const predictionInstruction = "What do you think will happen next? Support your predictions with details you can see.";
+
+function validSpeakingSample({ task, sampleAnswer, predictionSampleAnswer, sampleAnswersByChoice }) {
+  if (task === 5) return Array.isArray(sampleAnswersByChoice) && sampleAnswersByChoice.length === 2 &&
+    sampleAnswersByChoice.every(string) && sampleAnswersByChoice[0].trim() !== sampleAnswersByChoice[1].trim();
+  return string(sampleAnswer) && (task !== 3 || (string(predictionSampleAnswer) && sampleAnswer.trim() !== predictionSampleAnswer.trim()));
+}
 
 function service(db, app, config, storage = getStorage(app)) {
   const bucketName = process.env.SPEAKING_IMAGE_BUCKET;
@@ -32,7 +39,7 @@ function service(db, app, config, storage = getStorage(app)) {
   if (!["bucket", "firestore"].includes(store)) throw Error("Unknown SPEAKING_IMAGE_STORE");
   if (store === "bucket" && !bucketName) throw Error("SPEAKING_IMAGE_BUCKET is required");
   const bucket = bucketName ? storage.bucket(bucketName) : undefined;
-  const bank = createQuestionBank(db, Date.now, "speakingAi", (item) => digest(JSON.stringify(item.prompt)));
+  const bank = createQuestionBank(db, Date.now, "speakingAi", (item) => digest(JSON.stringify(item.prompt)), validSpeakingSample);
   const imageDocument = id => db.collection("speakingAiQuestions").doc("assets").collection("images").doc(id);
   async function saveImage(bytes) {
     const hash = digest(bytes);
@@ -101,7 +108,7 @@ function service(db, app, config, storage = getStorage(app)) {
     }
   }
 
-  async function pictures(brief, labels, reserve) {
+  async function pictures(brief, labels, reserve, imagesByFile) {
     await reserve();
     const image = await config.cloudflare.image(
       brief + ". Clear everyday educational illustration, no lettering.",
@@ -121,38 +128,73 @@ function service(db, app, config, storage = getStorage(app)) {
           .webp()
           .toBuffer();
         const id = await saveImage(bytes);
-        return { file: "ai/" + id, alt };
+        const file = "ai/" + id;
+        imagesByFile.set(file, bytes);
+        return { file, alt };
       }),
     );
+  }
+
+  async function addPictureSamples(prompts, imagesByFile, reserve) {
+    const visual = prompts.filter(({ prompt }) => prompt.image || prompt.comparison);
+    if (!visual.length) return;
+    const instruction = `Write natural 60-second CELPIP speaking responses to the supplied questions, using only visible details from the referenced illustrations and the stated facts. The image alt text is an illustration brief and may differ from the final picture. Return JSON {samples:[...]} with one entry per supplied task.
+For task 3 return {task,sampleAnswer,predictionSampleAnswer}. Describe the scene in sampleAnswer. Answer this separate task about the same picture in predictionSampleAnswer: ${predictionInstruction}
+For task 5 return {task,sampleAnswersByChoice:[first,second]}. Each answer must defend its corresponding choice against the alternative, addressing the listener in the persuasion instruction.
+For task 8 return {task,sampleAnswer} describing the pictured object to the listener and addressing the instruction. Use the learner's voice without commentary.`;
+    const parts = [{ text: JSON.stringify(visual) }];
+    for (const [file, bytes] of imagesByFile) {
+      parts.push({ text: file }, { inlineData: { mimeType: "image/webp", data: bytes.toString("base64") } });
+    }
+    const result = await call(config.generationModel, parts, instruction, reserve, async () => {
+      const captions = {};
+      for (const [file, bytes] of imagesByFile) {
+        captions[file] = await config.cloudflare.describe(bytes);
+        assert(typeof captions[file] === "string" && captions[file].trim());
+      }
+      return config.cloudflare.json("speaking_samples", instruction + " Use the supplied captions as observations of the final illustrations.", { prompts: visual, captions });
+    });
+    assert(Array.isArray(result?.samples) && result.samples.length === visual.length);
+    for (const item of visual) {
+      const sample = result.samples.find(row => row?.task === item.task);
+      assert(sample && validSpeakingSample(sample));
+      if (item.task === 5) item.sampleAnswersByChoice = sample.sampleAnswersByChoice.map(answer => answer.trim());
+      else {
+        item.sampleAnswer = sample.sampleAnswer.trim();
+        if (item.task === 3) item.predictionSampleAnswer = sample.predictionSampleAnswer.trim();
+      }
+    }
   }
 
   async function generate(tasks, reserve) {
     const instruction =
       "Generate original Canadian English CELPIP Speaking prompts. Return JSON array with one object per requested task: {task,context,instruction}. Address the learner directly. For task 3 also supply scene (visual brief with several actions and plausible next events); do not reveal predictions. For task 5 also supply options: three {title,details:[three short facts]} and persuasion (instruction to persuade the listener against option three). For task 8 also supply scene describing the unusual object. Task 6 must give two alternatives.";
     const requested = tasks.map((task) => ({ task, purpose: styles[task - 1] }));
+    const sampleInstruction = " For tasks 1, 2, 6 and 7 include sampleAnswer: a complete, natural spoken answer to precisely that prompt, in the learner's voice. For task 6 choose one listener. Write for 90 seconds on tasks 1 and 7 and 60 seconds on tasks 2 and 6. Keep each sample separate from the question.";
     const rows = await call(
       config.generationModel,
       [{ text: JSON.stringify(requested) }],
-      instruction,
+      instruction + sampleInstruction,
       reserve,
       async () =>
         (
           await config.cloudflare.json(
             "speaking_prompts",
-            instruction + " Wrap the requested array in an object with key prompts.",
+            instruction + sampleInstruction + " Wrap the requested array in an object with key prompts.",
             requested,
           )
         ).prompts,
     );
     assert(Array.isArray(rows) && rows.length === tasks.length);
     const prompts = [];
+    const imagesByFile = new Map();
     for (const task of tasks) {
       const row = rows.find((r) => r?.task === task);
       assert(row && string(row.context) && string(row.instruction));
       const prompt = { context: row.context, instruction: row.instruction };
       if (task === 3 || task === 8) {
         assert(string(row.scene));
-        [prompt.image] = await pictures(row.scene, [row.scene], reserve);
+        [prompt.image] = await pictures(row.scene, [row.scene], reserve, imagesByFile);
       }
       if (task === 5) {
         assert(
@@ -172,6 +214,7 @@ function service(db, app, config, storage = getStorage(app)) {
             labels.join(", "),
           labels,
           reserve,
+          imagesByFile,
         );
         const options = row.options.map(({ title, details }, i) => ({ title, details, image: images[i] }));
         prompt.comparison = {
@@ -180,8 +223,14 @@ function service(db, app, config, storage = getStorage(app)) {
           instruction: row.persuasion,
         };
       }
-      prompts.push({ task, prompt });
+      const item = { task, prompt };
+      if (!prompt.image && !prompt.comparison) {
+        assert(string(row.sampleAnswer));
+        item.sampleAnswer = row.sampleAnswer.trim();
+      }
+      prompts.push(item);
     }
+    await addPictureSamples(prompts, imagesByFile, reserve);
     return { prompts };
   }
   return {
@@ -190,17 +239,17 @@ function service(db, app, config, storage = getStorage(app)) {
       const units = [...new Set(tasks.map((t) => (t === 4 ? 3 : t)))];
       const result = await bank.getPrompts(uid, units, (missing) => generate(missing, reserve));
       return result.prompts
-        .flatMap((row) =>
+        .flatMap(({ predictionSampleAnswer, ...row }) =>
           row.task !== 3
             ? [row]
             : [
                 row,
                 {
                   task: 4,
+                  sampleAnswer: predictionSampleAnswer,
                   prompt: {
                     context: "Look at the scene in the picture.",
-                    instruction:
-                      "What do you think will happen next? Support your predictions with details you can see.",
+                    instruction: predictionInstruction,
                     image: row.prompt.image,
                   },
                 },

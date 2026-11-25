@@ -1,4 +1,4 @@
-import { preparePictures, speakingRequest, type SpeakingSnapshot } from "./speakingAi";
+import { hasSpeakingSample, preparePictures, speakingRequest, type SpeakingSnapshot } from "./speakingAi";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import useSound from "use-sound";
@@ -220,6 +220,9 @@ export default function Practice({ skill, mode, firstTask, initialSet, initialAi
             const result = await speakingRequest<{ prompts: SpeakingSnapshot[] }>(
               ai.user, "prompts", JSON.stringify({ tasks }), controller.signal
             );
+            if (!Array.isArray(result.prompts) || !result.prompts.every(hasSpeakingSample)) {
+              throw new Error("The question set is incomplete. Try again.");
+            }
             speakingPrompts = result.prompts;
           }
           if (!tasks.every(task => speakingPrompts?.some(item => item.task === task && item.prompt?.instruction))) {

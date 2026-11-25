@@ -30,8 +30,8 @@ const validPromptRequest = ajv.compile(object({
 const validFeedbackRequest = ajv.compile(object({ answers: array(answer, 1, 2) }));
 
 const generationSchemas = {
-  1: object({ context: text, recipient: text, points: array(text, 3) }),
-  2: object({ context: text, options: array(text, 2) }),
+  1: object({ context: text, recipient: text, points: array(text, 3), sampleAnswer: text }),
+  2: object({ context: text, options: array(text, 2), sampleAnswer: text }),
 };
 const criterionSchema = object({ observation: text, revision: text, excerpt: { type: ["string", "null"] } });
 const taskFeedbackSchema = object({
@@ -65,7 +65,7 @@ Use realistic everyday work, neighbourhood, consumer, education or community sit
 Make the scenario self-contained and accessible without specialist knowledge. Never reproduce an official or remembered test question.
 For Task 1 give a short scenario, a recipient as a noun phrase such as "the building manager", and three distinct actions the writer should address in an email.
 For Task 2 give a short scenario with a named decision-maker seeking feedback, and two distinct, equally plausible choices. Return each option as text without an A/B label.
-Use different scenarios when asked for both tasks. Return only the requested fields. Leave out example answers, commentary, time limits and word counts.
+Use different scenarios when asked for both tasks. For each question, put a complete 150–200 word response to that exact scenario in sampleAnswer. Aim for 170 words. For an email, address the recipient and all three points. For a survey, choose one of the supplied options and support it with specific reasons. Use natural paragraphs. Keep the sample out of the question fields and omit commentary and word counts.
 `;
 
 const gradingInstructions = `
@@ -118,6 +118,7 @@ function toPrompt(task, result) {
   }
   return {
     task,
+    sampleAnswer: result.sampleAnswer.trim(),
     prompt: {
       context: clean(result.context, 1200),
       instruction: task === 1
@@ -219,6 +220,7 @@ function createGemini({ apiKey, generationModel, gradingModel, gradingFallbackMo
     if (!valid(result)) throw new WritingError(502, "provider_result");
     if (isGeneration) {
       const prompts = input.tasks.map((task) => toPrompt(task, result[taskKey(task)]));
+      if (!prompts.every(validWritingSample)) throw new WritingError(502, "provider_result");
       if (prompts.length === 2 && prompts[0].prompt.context.toLowerCase() === prompts[1].prompt.context.toLowerCase()) {
         throw new WritingError(502, "provider_result");
       }
@@ -232,4 +234,10 @@ function createGemini({ apiKey, generationModel, gradingModel, gradingFallbackMo
   };
 }
 
-module.exports = { createGemini, parseRequest, WritingError };
+function validWritingSample({ sampleAnswer }) {
+  if (typeof sampleAnswer !== "string" || sampleAnswer.length > 3000) return false;
+  const words = sampleAnswer.trim().split(/\s+/u).length;
+  return words >= 150 && words <= 200;
+}
+
+module.exports = { createGemini, parseRequest, validWritingSample, WritingError };

@@ -7,9 +7,10 @@ export type WritingPrompt = Pick<Prompt, "context" | "instruction"> & { points: 
 export interface PromptSnapshot {
   task: WritingTask;
   prompt: WritingPrompt;
+  sampleAnswer?: string;
 }
 
-export interface WritingSubmission extends PromptSnapshot {
+export interface WritingSubmission extends Pick<PromptSnapshot, "task" | "prompt"> {
   text: string;
 }
 

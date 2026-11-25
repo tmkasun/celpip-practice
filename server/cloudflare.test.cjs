@@ -35,6 +35,7 @@ test("Writing validates Cloudflare results through the Gemini prompt schema", as
       task1: {
         context: "A music class.",
         recipient: "the teacher",
+        sampleAnswer: "I would like to join your evening music class. ".repeat(18).trim(),
         points: ["Ask a question", "Explain your concern", "Suggest a solution"],
       },
     },
@@ -52,6 +53,9 @@ test("Writing validates Cloudflare results through the Gemini prompt schema", as
     },
   });
   const input = { tasks: [1] };
-  assert.equal((await run("prompts", input)).prompts[0].prompt.context, "A music class.");
+  const expectedSample = results[0].task1.sampleAnswer;
+  const [row] = (await run("prompts", input)).prompts;
+  assert.equal(row.prompt.context, "A music class.");
+  assert.equal(row.sampleAnswer, expectedSample);
   await assert.rejects(run("prompts", input), { code: "provider_result" });
 });

@@ -31,12 +31,12 @@ jest.mock("firebase/auth", () => ({
 }));
 
 const prompts: PromptSnapshot[] = [
-  { task: 1, prompt: {
+  { task: 1, sampleAnswer: "Dear Ferry Manager, I depend on bicycle access for my commute.", prompt: {
     context: "The ferry service stopped accepting bicycles during the morning commute.",
     instruction: "Write an email to the ferry manager in about 150–200 words.",
     points: ["Describe your commute.", "Explain the impact.", "Suggest a workable change."],
   } },
-  { task: 2, prompt: {
+  { task: 2, sampleAnswer: "I would support raised beds so more residents can garden.", prompt: {
     context: "Your community garden committee is planning a new shared space.",
     instruction: "Choose the option you prefer and explain your reasons in about 150–200 words.",
     points: ["Option A — Add raised beds.", "Option B — Build a covered seating area."],
@@ -148,6 +148,7 @@ test("waits for both generated prompts, grades the completed mock once and resto
   await act(async () => generation.resolve(json({ prompts })));
   expect(screen.getByText(prompts[0].prompt.context)).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: prompts[0].prompt.instruction })).toBeInTheDocument();
+  expect(screen.queryByText(prompts[0].sampleAnswer!)).not.toBeInTheDocument();
   expect(screen.getByRole("textbox", { name: "Your response" })).toHaveFocus();
   expect(screen.getByRole("timer")).toHaveTextContent("27:00");
   const generationCalls = calls.mock.calls.filter(([path]) => path === "/api/writing/prompts");
@@ -166,19 +167,28 @@ test("waits for both generated prompts, grades the completed mock once and resto
   expect(options?.headers).toMatchObject({ Authorization: "Bearer valid-token" });
   expect(JSON.parse(String(options?.body))).toEqual({
     answers: [
-      { ...prompts[0], text: "Please restore bicycle access." },
-      { ...prompts[1], text: "Raised beds would welcome more gardeners." },
+      { task: 1, prompt: prompts[0].prompt, text: "Please restore bicycle access." },
+      { task: 2, prompt: prompts[1].prompt, text: "Raised beds would welcome more gardeners." },
     ],
   });
+  expect(screen.getByRole("heading", { name: "Sample answer" })).toBeVisible();
+  expect(screen.getByText(prompts[0].sampleAnswer!)).toBeVisible();
+  expect(screen.getByLabelText("One change for next time")).not.toBeVisible();
+  fireEvent.click(screen.getByText("Self-review checklist"));
+  expect(screen.getByLabelText("One change for next time")).toBeVisible();
   fireEvent.change(screen.getByRole("textbox", { name: "One change for next time" }), { target: { value: "Keep my own notes." } });
   await act(async () => grading.resolve(json({ tasks: [taskFeedback(1), taskFeedback(2)], overallLevel: 9 })));
   expect(screen.getByText("Overall Writing estimate · Level 9")).toBeInTheDocument();
   expect(screen.getByRole("textbox", { name: "One change for next time" })).toHaveValue("Keep my own notes.");
   fireEvent.click(screen.getByRole("button", { name: "Task 2" }));
   expect(screen.getByText("Task 2 estimate · Level 9")).toBeInTheDocument();
+  expect(screen.getByText(prompts[1].sampleAnswer!)).toBeVisible();
+  expect(screen.queryByText(prompts[0].sampleAnswer!)).not.toBeInTheDocument();
+  expect(screen.getByLabelText("One change for next time")).not.toBeVisible();
   page.unmount();
   await act(async () => { open("/review/" + loadSessions()[0].id); });
   expect(screen.getByText("Task 1 estimate · Level 9")).toBeInTheDocument();
+  expect(screen.getByText(prompts[0].sampleAnswer!)).toBeVisible();
   expect(calls.mock.calls.filter(([path]) => path === "/api/writing/feedback")).toHaveLength(1);
 });
 
@@ -218,6 +228,7 @@ test("grades a built-in mock from review and restores the saved feedback", async
   fireEvent.click(screen.getByRole("button", { name: /Finish section/ }));
 
   expect(screen.getByRole("heading", { name: "Writing mock review" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Sample answer" })).toBeVisible();
   expect(screen.getByRole("button", { name: "Get AI feedback" })).toBeDisabled();
   await signIn();
   fireEvent.click(screen.getByRole("button", { name: "Get AI feedback" }));
@@ -282,10 +293,12 @@ test("sends only finished nonblank writing from a previous interrupted attempt",
   const attempt: Session = {
     id: "earlier-attempt", skill: "writing", mode: "mock", set: 2, status: "interrupted", createdAt: Date.now(),
     responses: [{ task: 1, text: "I’m writing to request a refund.", finished: true }, { task: 2, text: "An unfinished survey." }],
+    writingPrompts: prompts.map(({ task, prompt }) => ({ task, prompt })),
   };
   localStorage.setItem("celpip-session-" + attempt.id, JSON.stringify(attempt));
   const requests = enableApi(async () => json({ tasks: [taskFeedback(1)] }));
   open("/review/" + attempt.id);
+  expect(screen.queryByRole("heading", { name: "Sample answer" })).not.toBeInTheDocument();
   await signIn();
   fireEvent.click(screen.getByRole("button", { name: "Get AI feedback" }));
   expect(await screen.findByText("Task 1 estimate · Level 9")).toBeInTheDocument();
@@ -297,7 +310,7 @@ test("sends only finished nonblank writing from a previous interrupted attempt",
 });
 
 test("restores Speaking feedback and continues a prediction drill with the recorded scene", async () => {
-  const speakingPrompts = [3, 4].map(task => ({task, prompt: {
+  const speakingPrompts = [3, 4].map(task => ({task, sampleAnswer: task === 3 ? "Two people are waiting." : "They will cross soon.", prompt: {
     ...getPrompt("speaking", 1, task),
     image: {file: "ai/" + "a".repeat(64), alt: "Two people at a crossing."}
   }}));
@@ -315,12 +328,32 @@ test("restores Speaking feedback and continues a prediction drill with the recor
   open("/review/" + session.id);
   expect(screen.getByText("Task 3 practice estimate · Level 8")).toBeInTheDocument();
   expect(screen.getByText("Clear pace.")).toBeInTheDocument();
+  expect(screen.getByText("Two people are waiting.")).toBeVisible();
   expect(screen.getByRole("img")).toHaveAttribute("src", "/api/speaking/images/" + "a".repeat(64));
   const next = screen.getByRole("link", {name: "Practice Task 4 with this picture"});
   fireEvent.click(next);
   expect(await screen.findByRole("button", {name:"AI-generated"})).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("heading", {name:"Making Predictions"})).toBeInTheDocument();
   expect(calls.mock.calls.every(([url]) => url === "/api/writing/config")).toBe(true);
+});
+
+test.each([0, 1])("shows the sample for the selected Speaking option %i and hides missing legacy samples", async choice => {
+  const samples: [string, string] = ["The dome tent is easier to carry.", "The cabin tent has room for bags."];
+  const session: Session = {
+    id: "comparison", skill: "speaking", mode: "mock", set: 1, status: "completed", createdAt: 0,
+    responses: [{task: 5, choice, finished: true}, {task: 6, finished: true}],
+    speakingPrompts: [
+      {task: 5, prompt: getPrompt("speaking", 1, 5), sampleAnswersByChoice: samples},
+      {task: 6, prompt: getPrompt("speaking", 1, 6)},
+    ],
+  };
+  localStorage.setItem("celpip-session-" + session.id, JSON.stringify(session));
+  open("/review/" + session.id);
+  expect(await screen.findByText(samples[choice])).toBeVisible();
+  expect(screen.queryByText(samples[1 - choice])).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", {name: "Task 6"}));
+  expect(screen.queryByRole("heading", {name: "Sample answer"})).not.toBeInTheDocument();
+  expect(screen.getByText("Self-review checklist")).toBeVisible();
 });
 
 test("keeps transcript feedback on retry and saves a successful full Speaking grade", async () => {
@@ -334,6 +367,7 @@ test("keeps transcript feedback on retry and saves a successful full Speaking gr
   const session: Session = {
     id:"partial-attempt", skill:"speaking", status:"completed", mode:"drill", set:1, createdAt:1,
     responses:[{task:1,finished:true,hasAudio:true}],
+    speakingPrompts: [{task:1, prompt:getPrompt("speaking", 1, 1), sampleAnswer:"Join a local club."}],
     speakingFeedback:{kind:"transcript",tasks:[{task:1,level:null,criteria:{
       Vocabulary:{observation:"Precise wording.",revision:"Vary the verbs."}
     }}]}
@@ -346,6 +380,9 @@ test("keeps transcript feedback on retry and saves a successful full Speaking gr
     }});
     expect(url).toBe("/api/speaking/feedback?fullOnly=true");
     expect((options?.body as FormData).get("1")).toBeInstanceOf(Blob);
+    expect(JSON.parse(String((options?.body as FormData).get("answers")))).toEqual([
+      {task:1, prompt:session.speakingPrompts![0].prompt}
+    ]);
     if (++retries === 1) return { ...json({error:"provider_limit"},429), headers:new Headers({"Retry-After":"12"}) };
     return json({tasks:[{task:1,level:8,criteria:{}}]});
   });

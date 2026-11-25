@@ -98,12 +98,6 @@ export default function SpeakingAiReview({
       ) : null}
       {(!feedback || (partial && ai.speakingAvailable)) && (
         <>
-          <p>
-            Requesting feedback sends your saved recordings and prompts to Google Gemini.{" "}
-            {partial
-              ? "This retry requests an audio-based grade."
-              : "If Gemini reaches its quota, Cloudflare may process the recordings and pictures for transcript-based feedback."}
-          </p>
           <WritingAiControls disabled={pending} />
           <button className="button primary" disabled={!ai.user || pending} onClick={grade}>
             {pending ? "Grading recordings…" : partial ? "Get full Speaking grade" : "Get AI feedback"}

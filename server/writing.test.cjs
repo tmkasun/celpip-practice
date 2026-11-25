@@ -10,11 +10,13 @@ const { createGemini, parseRequest, WritingError } = require("./writing.cjs");
 const email = {
   context: "Your apartment building is changing how residents sort recycling.",
   recipient: "the building manager",
+  sampleAnswer: "Our building needs clear recycling instructions for each household. ".repeat(18).trim(),
   points: ["Describe the problem.", "Explain how it affects your household.", "Suggest a practical solution."],
 };
 const survey = {
   context: "Your community garden committee has funding for one upgrade.",
   options: ["Add raised garden beds.", "Build a covered seating area."],
+  sampleAnswer: "Raised garden beds would help more neighbours grow their own vegetables. ".repeat(15).trim(),
 };
 const answerText = "Residents need clear labels so everyone can sort waste correctly.";
 const answer = {
@@ -63,6 +65,7 @@ test("generates both tasks in one structured, authenticated Google request", asy
   });
   const { prompts } = await run("prompts", parseRequest("prompts", { tasks: [2, 1] }));
   assert.equal(calls, 1);
+  assert.deepEqual(prompts.map(row => row.sampleAnswer), [email.sampleAnswer, survey.sampleAnswer]);
   assert.equal(prompts[0].prompt.instruction, "Write an email to the building manager in about 150–200 words.");
   assert.deepEqual(prompts[1].prompt.points, ["Option A — Add raised garden beds.", "Option B — Build a covered seating area."]);
 });
@@ -92,6 +95,7 @@ test("rejects invalid input and classifies quota, depleted prepaid billing and i
   const cases = [
     [Response.json({ error: { message: "Prepayment credits are depleted" } }, { status: 429 }), 503, "provider_billing"],
     [Response.json({}, { status: 429 }), 429, "busy"],
+    [providerResponse({ task1: { ...email, sampleAnswer: "Too short." } }), 502, "provider_result"],
     [providerResponse({ task1: email }, "MAX_TOKENS"), 502, "provider_result"],
     [providerResponse({ task1: { ...email, points: ["Only one point"] } }), 502, "provider_result"],
   ];

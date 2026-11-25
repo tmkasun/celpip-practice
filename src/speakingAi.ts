@@ -1,7 +1,19 @@
 import type { Prompt } from "./questions/pool";
 import type { User } from "firebase/auth";
 
-export type SpeakingSnapshot = { task: number; prompt: Prompt };
+export type SpeakingSnapshot = {
+  task: number;
+  prompt: Prompt;
+  sampleAnswer?: string;
+  sampleAnswersByChoice?: [string, string];
+};
+
+export function hasSpeakingSample(item: SpeakingSnapshot) {
+  const hasText = (value: unknown) => typeof value === "string" && Boolean(value.trim());
+  return item.task === 5
+    ? Array.isArray(item.sampleAnswersByChoice) && item.sampleAnswersByChoice.length === 2 && item.sampleAnswersByChoice.every(hasText)
+    : hasText(item.sampleAnswer);
+}
 export interface SpeakingFeedback {
   kind?: "transcript";
   overallLevel?: number;

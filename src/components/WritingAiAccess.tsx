@@ -126,7 +126,8 @@ export function WritingAiProvider({ children }: { children: ReactNode }) {
         const result = await request<{ prompts: PromptSnapshot[] }>("prompts", { tasks }, signal);
         if (!Array.isArray(result.prompts) || result.prompts.length !== tasks.length ||
           tasks.some((task) => !result.prompts.some((item) => item.task === task && item.prompt?.context &&
-            item.prompt.instruction && item.prompt.points?.length === (task === 1 ? 3 : 2)))) {
+            item.prompt.instruction && item.prompt.points?.length === (task === 1 ? 3 : 2) &&
+            typeof item.sampleAnswer === "string" && item.sampleAnswer.trim()))) {
           throw new WritingAiError(502, "provider_result");
         }
         return result.prompts;
