@@ -11,9 +11,9 @@ function questionId({ task, prompt }) {
     typeof value === "string" ? normalize(value) : value)));
 }
 
-function createQuestionBank(db, clock = Date.now) {
-  const bank = db.collection("writingAiQuestions");
-  const seen = db.collection("writingAiSeen");
+function createQuestionBank(db, clock = Date.now, prefix = "writingAi", identify = questionId) {
+  const bank = db.collection(prefix + "Questions");
+  const seen = db.collection(prefix + "Seen");
   const pool = (task) => bank.doc("task" + task);
 
   async function claim(uid, tasks) {
@@ -38,7 +38,7 @@ function createQuestionBank(db, clock = Date.now) {
   }
 
   async function add(prompts) {
-    const refs = prompts.map((item) => pool(item.task).collection("prompts").doc(questionId(item)));
+    const refs = prompts.map((item) => pool(item.task).collection("prompts").doc(identify(item)));
     const poolRefs = prompts.map(({ task }) => pool(task));
     const createdAt = new Date(clock());
     return db.runTransaction(async (transaction) => {

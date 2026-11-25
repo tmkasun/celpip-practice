@@ -1,3 +1,4 @@
+import type { SpeakingFeedback, SpeakingSnapshot } from "./speakingAi";
 import { getPrompt, type Prompt, type SetId, type Skill } from "./questions/pool";
 import type { PromptSnapshot, WritingFeedback } from "./writingAi";
 
@@ -20,6 +21,8 @@ export interface Session {
   createdAt: number;
   deadline?: number;
   responses: Response[];
+  speakingPrompts?: SpeakingSnapshot[];
+  speakingFeedback?: SpeakingFeedback;
   writingPrompts?: PromptSnapshot[];
   writingFeedback?: WritingFeedback;
 }
@@ -27,13 +30,14 @@ export interface Session {
 const sessionPrefix = "celpip-session-";
 
 export function getSessionPrompt(session: Session, task: number): Prompt | undefined {
+  if (session.speakingPrompts) return session.speakingPrompts.find(item => item.task === task)?.prompt;
   return session.writingPrompts
     ? session.writingPrompts.find((item) => item.task === task)?.prompt
     : getPrompt(session.skill, session.set, task);
 }
 
 export function promptSetLabel(session: Session) {
-  return session.writingPrompts ? "AI-generated" : "Set " + session.set;
+  return session.writingPrompts || session.speakingPrompts ? "AI-generated" : "Set " + session.set;
 }
 
 export function writingDraftUrl(session: Session) {

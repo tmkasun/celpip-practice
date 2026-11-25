@@ -1,7 +1,8 @@
+import { imageSource } from "../speakingAi";
 import type { Illustration, Option, Prompt } from "../questions/pool";
 
 function PromptImage({ image }: { image: Illustration }) {
-  return <img src={process.env.PUBLIC_URL + "/practice/" + image.file} alt={image.alt} />;
+  return <img src={imageSource(image.file)} alt={image.alt} />;
 }
 
 function OptionDetails({ option }: { option: Option }) {

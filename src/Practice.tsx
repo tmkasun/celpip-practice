@@ -1,3 +1,4 @@
+import { preparePictures, speakingRequest, type SpeakingSnapshot } from "./speakingAi";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import useSound from "use-sound";
@@ -9,7 +10,7 @@ import useCountdown, { formatTime } from "./hooks/useCountdown";
 import useMic from "./hooks/useMic";
 import { audioKey, getSessionPrompt, type Response, type Session } from "./practiceStorage";
 import { speakingTimes, taskTitles, writingSeconds, type SetId, type Skill } from "./questions/pool";
-import { WritingAiError, type PromptSnapshot, type WritingTask } from "./writingAi";
+import { type PromptSnapshot, type WritingTask } from "./writingAi";
 import ding from "./sounds/ding.mp3";
 import end from "./sounds/end.mp3";
 import "./Mock.css";
@@ -28,6 +29,7 @@ interface PracticeProps {
   firstTask: number;
   initialSet: SetId;
   initialAi: boolean;
+  paired?: SpeakingSnapshot[];
   draft?: Session;
   save: (session: Session) => void;
   keepAudio: (key: string, blob: Blob) => void;
@@ -87,13 +89,14 @@ function SpeakingSchedule({ task, phase }: { task: number; phase: PhaseName }) {
   );
 }
 
-export default function Practice({ skill, mode, firstTask, initialSet, initialAi, draft, save, keepAudio }: PracticeProps) {
+export default function Practice({ skill, mode, firstTask, initialSet, initialAi, paired, draft, save, keepAudio }: PracticeProps) {
   const navigate = useNavigate();
   const ai = useWritingAi();
   const titles = taskTitles[skill];
   const [set, setSet] = useState<SetId>(draft?.set ?? initialSet);
   const [selectAi, setSelectAi] = useState(initialAi);
-  const useAi = skill === "writing" && selectAi;
+  const useAi = selectAi;
+  const available = skill === "speaking" ? ai.speakingAvailable : ai.available;
   const [session, setSession] = useState(draft);
   const [phase, showPhase] = useState<Phase>(
     draft ? { name: "write", task: firstTask, deadline: draft.deadline } : { name: "ready", task: firstTask }
@@ -102,6 +105,7 @@ export default function Practice({ skill, mode, firstTask, initialSet, initialAi
   const livePhase = useRef(phase);
   const mounted = useRef(false);
   const requestPending = useRef(false);
+  const [loadingSpeakingPrompts, setLoadingSpeakingPrompts] = useState(false);
   const generation = useRef<AbortController>();
   const heading = useRef<HTMLHeadingElement>(null);
   const editor = useRef<HTMLTextAreaElement>(null);
@@ -183,31 +187,6 @@ export default function Practice({ skill, mode, firstTask, initialSet, initialAi
   async function startSession() {
     if (requestPending.current || livePhase.current.name !== "ready") return;
     let writingPrompts: PromptSnapshot[] | undefined;
-    if (useAi) {
-      if (!ai.available || !ai.user) return;
-      const controller = new AbortController();
-      generation.current = controller;
-      requestPending.current = true;
-      setPending(true);
-      setAiMessage("");
-      if (isMock) switchPhase({ name: "generating", task: firstTask });
-      try {
-        writingPrompts = await ai.generate(isMock ? [1, 2] : [firstTask as WritingTask], controller.signal);
-        if (!mounted.current || controller.signal.aborted) return;
-      } catch (error) {
-        if (mounted.current && !controller.signal.aborted) {
-          setAiMessage(error instanceof WritingAiError ? error.message : "Couldn’t generate a prompt. Try again or choose a built-in set.");
-          if (isMock) switchPhase({ name: "ready", task: firstTask });
-        }
-        return;
-      } finally {
-        if (generation.current === controller) {
-          generation.current = undefined;
-          requestPending.current = false;
-          if (mounted.current) setPending(false);
-        }
-      }
-    }
     if (skill === "speaking") {
       requestPending.current = true;
       setPending(true);
@@ -222,6 +201,48 @@ export default function Practice({ skill, mode, firstTask, initialSet, initialAi
         if (mounted.current) setPending(false);
       }
     }
+    let speakingPrompts: SpeakingSnapshot[] | undefined;
+    if (useAi) {
+      if (!available || !ai.user) { mic.release(); return; }
+      const controller = new AbortController();
+      generation.current = controller;
+      requestPending.current = true;
+      setPending(true);
+      setAiMessage("");
+      if (isMock && skill === "writing") switchPhase({ name: "generating", task: firstTask });
+      try {
+        if (skill === "speaking") {
+          setLoadingSpeakingPrompts(true);
+          const tasks = isMock ? titles.map((_, i) => i + 1) : [firstTask];
+          if (paired?.some(p => p.task === firstTask)) {
+            speakingPrompts = paired;
+          } else {
+            const result = await speakingRequest<{ prompts: SpeakingSnapshot[] }>(
+              ai.user, "prompts", JSON.stringify({ tasks }), controller.signal
+            );
+            speakingPrompts = result.prompts;
+          }
+          if (!tasks.every(task => speakingPrompts?.some(item => item.task === task && item.prompt?.instruction))) {
+            throw new Error("The question set is incomplete. Try again.");
+          }
+          await preparePictures(speakingPrompts);
+        } else writingPrompts = await ai.generate(isMock ? [1, 2] : [firstTask as WritingTask], controller.signal);
+        if (!mounted.current || controller.signal.aborted) return;
+      } catch (error) {
+        if (mounted.current && !controller.signal.aborted) {
+          mic.release();
+          setAiMessage(error instanceof Error ? error.message : "Couldn’t generate a prompt. Try again or choose a built-in set.");
+          if (isMock && skill === "writing") switchPhase({ name: "ready", task: firstTask });
+        }
+        return;
+      } finally {
+        if (generation.current === controller) {
+          generation.current = undefined;
+          requestPending.current = false;
+          if (mounted.current) { setPending(false); setLoadingSpeakingPrompts(false); }
+        }
+      }
+    }
     beginTask(firstTask, {
       id: createId(),
       skill,
@@ -230,7 +251,7 @@ export default function Practice({ skill, mode, firstTask, initialSet, initialAi
       status: "active",
       createdAt: Date.now(),
       responses: [],
-      writingPrompts,
+      writingPrompts, speakingPrompts,
     });
   }
 
@@ -318,8 +339,10 @@ export default function Practice({ skill, mode, firstTask, initialSet, initialAi
   }
 
   function cancelGeneration() {
+    mic.release();
     generation.current?.abort();
     generation.current = undefined;
+    setLoadingSpeakingPrompts(false);
     requestPending.current = false;
     setPending(false);
     switchPhase({ name: "ready", task: firstTask });
@@ -328,7 +351,7 @@ export default function Practice({ skill, mode, firstTask, initialSet, initialAi
   const clock = phase.deadline !== undefined;
   const lastTask = phase.task === titles.length;
   const sectionName = skill === "writing" ? "Writing" : "Speaking";
-  const generated = Boolean(session?.writingPrompts);
+  const generated = Boolean(session?.writingPrompts || session?.speakingPrompts);
   const promptLabel = generated || generating || (ready && useAi) ? "AI-generated prompts" : "Prompt set " + set;
   const taskTitle = titles[phase.task - 1];
   const title = writingTask ? `Writing Task ${phase.task}: ${taskTitle}`
@@ -401,7 +424,7 @@ export default function Practice({ skill, mode, firstTask, initialSet, initialAi
                 "The prompt appears when you start the timer. Review your response when you finish."}
             </p>
             <div className="setup-fields">
-              {skill === "writing" ? (
+              {(skill === "writing" || ai.speakingAvailable || useAi) ? (
                 <fieldset className="prompt-choices" disabled={pending}>
                   <legend>Prompt set</legend>
                   <div className="actions">
@@ -417,7 +440,7 @@ export default function Practice({ skill, mode, firstTask, initialSet, initialAi
                   </div>
                 </fieldset>
               ) : (
-                <label>Prompt set<select value={set} onChange={(event) => setSet(Number(event.target.value) as SetId)} disabled={pending}>
+                <label>Prompt set<select value={set} onChange={(event) => choosePromptSet(Number(event.target.value) as SetId)} disabled={pending}>
                   <option value={1}>Set 1</option><option value={2}>Set 2</option>
                 </select></label>
               )}
@@ -428,14 +451,15 @@ export default function Practice({ skill, mode, firstTask, initialSet, initialAi
                 </>
               )}
             </div>
-            {useAi && (ai.available ? <WritingAiControls disabled={pending} /> : (
+            {useAi && (available ? <WritingAiControls disabled={pending} /> : (
               <p className="muted" role="status">{ai.checking ? "Checking AI availability…" : "AI-generated prompts are unavailable here. Choose a built-in set to continue."}</p>
             ))}
+            {loadingSpeakingPrompts && skill === "speaking" && <button type="button" className="button secondary" onClick={cancelGeneration}>Cancel generation</button>}
             {aiMessage && <p className="notice" role="alert">{aiMessage} You can also choose a built-in set.</p>}
             {mode === "drill" && skill === "speaking" && firstTask === 5 && <p className="muted">The option selection has its own 60-second timer.</p>}
             {skill === "speaking" && <p className="muted">Have your microphone ready. The app checks access before starting the timer.</p>}
-            <button type="button" className="button primary" onClick={startSession} disabled={pending || (useAi && (!ai.available || !ai.user)) || (mode === "drill" && skill === "speaking" && !validTiming)}>
-              {pending ? useAi ? "Generating prompts…" : "Checking microphone…" : mode === "mock" ? "Start mock" : "Show prompt and start"}
+            <button type="button" className="button primary" onClick={startSession} disabled={pending || (useAi && (!available || !ai.user)) || (mode === "drill" && skill === "speaking" && !validTiming)}>
+              {pending ? useAi && (skill === "writing" || loadingSpeakingPrompts) ? "Generating prompts…" : "Checking microphone…" : mode === "mock" ? "Start mock" : "Show prompt and start"}
             </button>
           </section>
         ) : writingTask ? (

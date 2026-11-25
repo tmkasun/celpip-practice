@@ -7,6 +7,7 @@ import {
 
 interface WritingAiAccess {
   available: boolean;
+  speakingAvailable: boolean;
   checking: boolean;
   ready: boolean;
   user: User | null;
@@ -29,6 +30,7 @@ const googleSignInErrors: Record<string, string> = {
 
 export function WritingAiProvider({ children }: { children: ReactNode }) {
   const [client, setClient] = useState<{ auth: Auth; sdk: typeof import("firebase/auth") } | null>();
+  const [flags, setFlags] = useState({ writing: true, speaking: false });
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
 
@@ -42,6 +44,7 @@ export function WritingAiProvider({ children }: { children: ReactNode }) {
         setClient(null);
         return;
       }
+      setFlags({ writing: config.writingEnabled !== false, speaking: Boolean(config.speakingEnabled) });
       const [appSdk, sdk] = await Promise.all([import("firebase/app"), import("firebase/auth")]);
       if (controller.signal.aborted) return;
       const app = appSdk.getApps().find((item) => item.name === "celpip-writing-ai") ??
@@ -113,7 +116,7 @@ export function WritingAiProvider({ children }: { children: ReactNode }) {
 
   return (
     <WritingAiContext.Provider value={{
-      available: Boolean(client),
+      available: Boolean(client) && flags.writing, speakingAvailable: Boolean(client) && flags.speaking,
       checking: client === undefined,
       ready,
       user,

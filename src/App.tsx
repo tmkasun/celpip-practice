@@ -28,7 +28,8 @@ function Home() {
         </section>
         <section className="card skill-card">
           <div className="skill-heading"><h2>Speaking</h2></div>
-          <Link className="button primary" to="/speaking/1">Start Speaking mock</Link>
+          <Link className="button primary" to="/mock/speaking">Start Speaking mock</Link>
+          <Link className="text-link" to="/speaking/1">Practice one Speaking task</Link>
         </section>
         <section className="card skill-card resource-card">
           <div className="skill-heading"><h2>Listening</h2><span>46–55 min</span></div>
@@ -60,7 +61,7 @@ function PracticeRoute({ skill, mode, sessions, save, keepAudio }: PracticeData 
   const requestedSet = search.get("set");
   const set = requestedSet === "2" ? 2 : 1;
   const hasRequestedSet = requestedSet === "1" || requestedSet === "2";
-  const openGeneratedSetup = search.get("source") === "ai" && skill === "writing";
+  const openGeneratedSetup = search.get("source") === "ai";
   const requestedDraft = search.get("draft");
   const task = mode === "mock" ? 1 : Number(taskId);
   if (!Number.isInteger(task) || task < 1 || task > taskTitles[skill].length) {
@@ -75,7 +76,7 @@ function PracticeRoute({ skill, mode, sessions, save, keepAudio }: PracticeData 
 
   return <Practice
     key={JSON.stringify([mode, skill, task, set, hasRequestedSet, openGeneratedSetup, requestedDraft])}
-    skill={skill} mode={mode} firstTask={task} initialSet={set} initialAi={openGeneratedSetup} draft={draft} save={save} keepAudio={keepAudio}
+    skill={skill} mode={mode} firstTask={task} initialSet={set} initialAi={openGeneratedSetup} paired={mode === "drill" && skill === "speaking" && task === 4 ? sessions.find(s => s.id === search.get("scene"))?.speakingPrompts?.filter(p => p.task === 3 || p.task === 4) : undefined} draft={draft} save={save} keepAudio={keepAudio}
   />;
 }
 

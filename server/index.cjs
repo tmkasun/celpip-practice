@@ -11,7 +11,7 @@ function limit(name, fallback) {
 }
 
 function readConfig() {
-  if (process.env.WRITING_AI_ENABLED !== "true") return undefined;
+  if (process.env.WRITING_AI_ENABLED !== "true" && process.env.SPEAKING_AI_ENABLED !== "true") return undefined;
   const required = (name) => {
     const value = process.env[name]?.trim();
     if (!value) throw new Error(name + " is required when AI Writing is enabled.");
@@ -40,14 +40,14 @@ function readConfig() {
   return config;
 }
 
-function createApp({ firebase, verifyIdToken, reserve, runGemini, questionBank, log = console.info } = {}) {
+function createApp({ firebase, verifyIdToken, reserve, runGemini, questionBank, speaking, writingEnabled = true, log = console.info } = {}) {
   const app = express();
   app.disable("x-powered-by");
   app.use("/api", (_req, res, next) => {
     res.set("Cache-Control", "no-store");
     next();
   });
-  app.get("/api/writing/config", (_req, res) => res.json({ firebase: firebase ?? null }));
+  app.get("/api/writing/config", (_req, res) => res.json({ firebase: firebase ?? null, ...(speaking && { writingEnabled, speakingEnabled: true }) }));
 
   const readJson = express.json({ limit: "180kb" });
   for (const operation of ["prompts", "feedback"]) {
@@ -57,7 +57,7 @@ function createApp({ firebase, verifyIdToken, reserve, runGemini, questionBank, 
       const metrics = operation === "prompts" ? { cacheHits: 0, generatedTasks: 0 } : {};
       const logResult = (result) => log(JSON.stringify({ operation, result, ...metrics, durationMs: Date.now() - startedAt }));
       try {
-        if (!firebase) throw new WritingError(503, "unavailable");
+        if (!firebase || !writingEnabled) throw new WritingError(503, "unavailable");
         const token = req.get("Authorization")?.match(/^Bearer ([^\s]+)$/i)?.[1];
         if (!token) throw new WritingError(401, "sign_in");
         const user = await verifyIdToken(token).catch(() => null);
@@ -91,6 +91,7 @@ function createApp({ firebase, verifyIdToken, reserve, runGemini, questionBank, 
       }
     });
   }
+  if (speaking) require("./speaking.cjs").routes(app, speaking, verifyIdToken, reserve);
   app.use("/api", (_req, res) => res.status(404).json({ error: "not_found" }));
   app.use((error, _req, res, _next) => {
     const invalid = error.status === 400 || error.status === 413 || error.status === 415;
@@ -116,6 +117,8 @@ function start() {
     const firebaseApp = initializeApp({ projectId: config.firebase.projectId });
     const db = initializeFirestore(firebaseApp, { preferRest: true });
     services = {
+      writingEnabled: process.env.WRITING_AI_ENABLED === "true",
+      speaking: process.env.SPEAKING_AI_ENABLED === "true" ? require("./speaking.cjs").service(db, firebaseApp, config) : undefined,
       firebase: config.firebase,
       verifyIdToken: (token) => getAuth(firebaseApp).verifyIdToken(token),
       reserve: createQuota(db, config.limits),

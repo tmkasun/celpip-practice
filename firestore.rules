@@ -9,6 +9,8 @@ service cloud.firestore {
         && collection != 'writingAiDaily'
         && collection != 'writingAiQuestions'
         && collection != 'writingAiSeen'
+        && collection != 'speakingAiQuestions'
+        && collection != 'speakingAiSeen'
         && request.time < timestamp.date(2026, 12, 23);
     }
   }

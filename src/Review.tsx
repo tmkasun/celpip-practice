@@ -1,3 +1,4 @@
+import SpeakingAiReview from "./components/SpeakingAiReview";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import PromptView, { promptText } from "./components/PromptView";
@@ -104,7 +105,7 @@ function ReviewResponse({ session, response, getMemoryAudio }: {
   const { task, text } = response;
   const prompt = getSessionPrompt(session, task);
   const title = taskTitles[skill][task - 1];
-  const fileName = "celpip-" + skill + "-task-" + task + (session.writingPrompts ? "-ai" : "-set-" + set);
+  const fileName = "celpip-" + skill + "-task-" + task + (session.writingPrompts || session.speakingPrompts ? "-ai" : "-set-" + set);
   const [copyStatus, setCopyStatus] = useState("");
   const shareText = ["CELPIP practice · " + title, prompt ? promptText(prompt) : "Saved prompt unavailable", "My response\n" + text].join("\n\n");
 
@@ -227,14 +228,16 @@ export default function Review({ session, update, getMemoryAudio }: {
               current.writingFeedback ? current : { ...current, writingFeedback: feedback }
             )} />
           )}
+          {skill === "speaking" && <SpeakingAiReview session={session} selected={selected} getMemoryAudio={getMemoryAudio} save={speakingFeedback => update(current => ({...current, speakingFeedback}))}/>}
+          {skill === "speaking" && selected === 3 && <Link className="button secondary" to={"/speaking/4?" + (session.speakingPrompts ? "source=ai&scene=" + encodeURIComponent(session.id) : "set=" + set)}>Practice Task 4 with this picture</Link>}
           <CheckList skill={skill} response={response} save={(changes) => update((current) => ({
             ...current,
             responses: current.responses.map((item) => item.task === response.task ? { ...item, ...changes } : item),
           }))} />
           <div className="actions">
             <Link className="button secondary" to={taskUrl + "?set=" + set}>Practice this task</Link>
-            <Link className="button secondary" to={taskUrl + (writingPrompts ? "?source=ai" : "?set=" + (set === 1 ? 2 : 1))}>
-              {writingPrompts ? "Generate another prompt" : "Try the other prompt"}
+            <Link className="button secondary" to={taskUrl + (writingPrompts || session.speakingPrompts ? "?source=ai" : "?set=" + (set === 1 ? 2 : 1))}>
+              {writingPrompts || session.speakingPrompts ? "Generate another prompt" : "Try the other prompt"}
             </Link>
           </div>
         </>

@@ -38,6 +38,8 @@ export interface WritingFeedback {
 }
 
 export interface WritingAiConfig {
+  speakingEnabled?: boolean;
+  writingEnabled?: boolean;
   apiKey: string;
   authDomain: string;
   projectId: string;
@@ -65,9 +67,9 @@ export class WritingAiError extends Error {
 export async function getWritingAiConfig(signal: AbortSignal): Promise<WritingAiConfig | undefined> {
   const response = await fetch("/api/writing/config", { signal, headers: { Accept: "application/json" } });
   if (!response.ok) return undefined;
-  const { firebase } = await response.json();
+  const { firebase, speakingEnabled, writingEnabled } = await response.json();
   if (firebase && ["apiKey", "authDomain", "projectId", "appId"].every((key) => typeof firebase[key] === "string" && firebase[key])) {
-    return firebase;
+    return { ...firebase, speakingEnabled, writingEnabled };
   }
   return undefined;
 }

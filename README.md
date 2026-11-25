@@ -47,3 +47,19 @@ gcloud run services update celpip-practice --project="$CELPIP_HOSTING_PROJECT" -
 ```
 
 Verify a public Google sign-in, mock, and feedback after rollout. Check Cloud Run logs for Writing API status and latency, and AI Studio for spend and quota. To pause AI while keeping built-in practice online, update the service with `WRITING_AI_ENABLED=false`. [Cloud Run deployment](https://docs.cloud.google.com/run/docs/quickstarts/build-and-deploy/deploy-nodejs-service) · [Secret Manager integration](https://docs.cloud.google.com/run/docs/configuring/services/secrets)
+
+## Configure AI Speaking
+
+Enable the same Google sign-in, Gemini key, Firestore, and service account used for Writing. Create a Cloud Storage bucket for the generated illustrations, grant the runtime service account object read/write access, deploy the updated Firestore rules, and set these server environment variables:
+
+```dotenv
+SPEAKING_AI_ENABLED=true
+SPEAKING_IMAGE_BUCKET=your-bucket-name
+GEMINI_SPEAKING_IMAGE_MODEL=gemini-3.1-flash-image
+```
+
+Speaking and Writing can be enabled independently. Speaking uses the configured text-generation model and grading model. Set `GEMINI_SPEAKING_GRADING_MODEL` to override the audio-capable grading model. Both skills share the existing `WRITING_AI_*` quota counters. An uncached mock takes one text call and three image calls. Feedback takes one additional call. Retain the question bank, cursors, and generated images for saved attempts. Only practice illustrations are served from the bucket through the app.
+
+From the home page, choose a Speaking mock or individual task, select **AI-generated**, and sign in. Review can grade saved built-in and AI attempts. Requesting feedback sends available recordings to Google. The app stores recordings and returned feedback in the current browser. A complete mock with eight assessable recordings receives a section estimate.
+
+Before enabling Speaking in production, run the automated suites, try Chrome and Safari microphone recordings with the configured models, inspect all three types of illustration, and compare practice estimates against published CELPIP Speaking samples.

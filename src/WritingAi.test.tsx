@@ -295,3 +295,30 @@ test("sends only finished nonblank writing from a previous interrupted attempt",
   fireEvent.click(screen.getByRole("button", { name: "Task 2" }));
   expect(screen.getByText("This task had no finished response to grade.")).toBeInTheDocument();
 });
+
+test("restores Speaking feedback and continues a prediction drill with the recorded scene", async () => {
+  const speakingPrompts = [3, 4].map(task => ({task, prompt: {
+    ...getPrompt("speaking", 1, task),
+    image: {file: "ai/" + "a".repeat(64), alt: "Two people at a crossing."}
+  }}));
+  const session: Session = {
+    id: "scene-attempt", skill: "speaking", status: "completed", mode: "drill", set: 1,
+    createdAt: 0, responses: [{task: 3, finished: true}], speakingPrompts,
+    speakingFeedback: {tasks: [{task: 3, level: 8, criteria: {
+      Listenability: {observation: "Clear pace.", revision: "Pause between ideas."}
+    }}]}
+  };
+  localStorage.setItem("celpip-session-" + session.id, JSON.stringify(session));
+  const calls = jest.spyOn(globalThis, "fetch").mockResolvedValue(json({
+    speakingEnabled: true, firebase: {apiKey: "public", projectId: "project", authDomain: "localhost", appId: "app"}
+  }));
+  open("/review/" + session.id);
+  expect(screen.getByText("Task 3 practice estimate · Level 8")).toBeInTheDocument();
+  expect(screen.getByText("Clear pace.")).toBeInTheDocument();
+  expect(screen.getByRole("img")).toHaveAttribute("src", "/api/speaking/images/" + "a".repeat(64));
+  const next = screen.getByRole("link", {name: "Practice Task 4 with this picture"});
+  fireEvent.click(next);
+  expect(await screen.findByRole("button", {name:"AI-generated"})).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("heading", {name:"Making Predictions"})).toBeInTheDocument();
+  expect(calls.mock.calls.every(([url]) => url === "/api/writing/config")).toBe(true);
+});

@@ -39,9 +39,9 @@ test("opens the practice home and connects all four skills to practice", () => {
   const writing = within(screen.getByRole("heading", { name: "Writing" }).closest("section")!);
   const speaking = within(screen.getByRole("heading", { name: "Speaking" }).closest("section")!);
   expect(writing.getByRole("link", { name: "Start Writing mock" })).toHaveAttribute("href", "/writing/1");
-  expect(speaking.getByRole("link", { name: "Start Speaking mock" })).toHaveAttribute("href", "/speaking/1");
+  expect(speaking.getByRole("link", { name: "Start Speaking mock" })).toHaveAttribute("href", "/mock/speaking");
   expect(writing.getAllByRole("link")).toHaveLength(1);
-  expect(speaking.getAllByRole("link")).toHaveLength(1);
+  expect(speaking.getByRole("link", {name: "Practice one Speaking task"})).toHaveAttribute("href", "/speaking/1");
   expect(writing.getByText("AI mock available")).toBeInTheDocument();
   for (const skill of ["Listening", "Reading"]) {
     expect(screen.getByRole("link", { name: "Official " + skill + " practice" }))
