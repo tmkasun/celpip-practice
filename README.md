@@ -14,7 +14,7 @@ Use Node 22.9 or newer. Run `npm ci`, then `npm start` to open the app at `http:
 4. For local AI testing, set `WRITING_AI_ENABLED=true` in `.env.server` and supply `FIREBASE_PROJECT_ID`, `FIREBASE_APP_ID`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_WEB_API_KEY`, and the server-only `GEMINI_API_KEY`. Use Application Default Credentials with Firestore access for the Firebase project. You can obtain them with `gcloud auth application-default login`.
 5. Run `npm start` and finish a Writing mock with built-in or AI-generated prompts. On the review page, sign in with Google and select **Get AI feedback** to grade the finished responses.
 
-The default models are `gemini-3.5-flash-lite` for prompts and `gemini-3.8-flash` for feedback. Both model IDs are server settings. The default limits count Gemini calls for prompt generation and feedback. They allow six per Google account per day, 10 globally per rolling minute, and 300 globally per day. Daily counters reset at midnight Pacific time. Cached questions do not consume these limits, even when generation or feedback is at its limit. A mock that needs both new questions generates them together using one quota reservation, followed by one for feedback.
+The default models are `gemini-3.5-flash-lite` for prompts and `gemini-3.8-flash` for feedback. Both model IDs are server settings. The default limits count prompt generation, illustration, and feedback operations. A provider fallback shares its original reservation. They allow six per Google account per day, 10 globally per rolling minute, and 300 globally per day. Daily counters reset at midnight Pacific time. Cached questions do not consume these limits, even when generation or feedback is at its limit. A mock that needs both new questions generates them together using one quota reservation, followed by one for feedback.
 
 AI Writing first checks a shared Firestore question bank for questions the signed-in account has not received. Task 1 and Task 2 have separate pools, issued oldest first. Gemini generates only the tasks whose pool the account has exhausted, and validated results are persisted before they can be issued. Concurrent requests claim questions transactionally; a mock marks both tasks as seen together. Questions count as seen when issued, including both tasks of a mock, even if the attempt is abandoned. Exact duplicates are detected after normalizing Unicode, whitespace and letter case; duplicate output can trigger up to three generation calls, each consuming quota.
 
@@ -55,11 +55,20 @@ Enable the same Google sign-in, Gemini key, Firestore, and service account used 
 ```dotenv
 SPEAKING_AI_ENABLED=true
 SPEAKING_IMAGE_BUCKET=your-bucket-name
-GEMINI_SPEAKING_IMAGE_MODEL=gemini-3.1-flash-image
+CLOUDFLARE_ACCOUNT_ID=your-account-id
+CLOUDFLARE_API_TOKEN=your-server-token
 ```
 
-Speaking and Writing can be enabled independently. Speaking uses the configured text-generation model and grading model. Set `GEMINI_SPEAKING_GRADING_MODEL` to override the audio-capable grading model. Both skills share the existing `WRITING_AI_*` quota counters. An uncached mock takes one text call and three image calls. Feedback takes one additional call. Retain the question bank, cursors, and generated images for saved attempts. Only practice illustrations are served from the bucket through the app.
+Speaking and Writing can be enabled independently. Speaking uses the configured text-generation model and grading model. Set `GEMINI_SPEAKING_GRADING_MODEL` to override the audio-capable grading model. Both skills share the existing `WRITING_AI_*` quota counters. An uncached mock takes one text call and three image calls. Feedback uses one additional quota reservation. Retain the question bank, cursors, and generated images for saved attempts. Only practice illustrations are served from the bucket through the app.
 
-From the home page, choose a Speaking mock or individual task, select **AI-generated**, and sign in. Review can grade saved built-in and AI attempts. Requesting feedback sends available recordings to Google. The app stores recordings and returned feedback in the current browser. A complete mock with eight assessable recordings receives a section estimate.
+From the home page, choose a Speaking mock or individual task, select **AI-generated**, and sign in. Review can grade saved built-in and AI attempts. Requesting feedback sends available recordings to Gemini. When Gemini returns a quota error, Cloudflare Whisper transcribes them, and Llama gives transcript-based feedback. Use **Get full Speaking grade** to retry the original recordings with Gemini. The app stores recordings and returned feedback in the current browser. A complete mock with eight assessable recordings receives a section estimate.
 
 Before enabling Speaking in production, run the automated suites, try Chrome and Safari microphone recordings with the configured models, inspect all three types of illustration, and compare practice estimates against published CELPIP Speaking samples.
+
+## Cloudflare Workers AI
+
+Create a Workers AI API token for your account and set the two Cloudflare variables above in the server environment. For Cloud Run, mount the token from Secret Manager. Restart the API after changing credentials. [Cloudflare REST API setup](https://developers.cloudflare.com/workers-ai/get-started/rest-api/)
+
+FLUX.1 schnell generates all new Speaking illustrations. Cached questions and saved illustrations reuse the existing bucket. Gemini is the primary text and grading provider. When Gemini throttles a request, Cloudflare Llama 3.3 70B generates prompts or grades Writing with the same validation. The app's daily and per-minute limits apply before provider routing.
+
+Speaking fallback uses Whisper large-v3-turbo and, for visual tasks, Llama 3.2 Vision to describe the saved images. The account owner must accept the vision model's license using Cloudflare’s documented setup to enable captions. If vision is unavailable, feedback uses the transcript and prompt. Transcript feedback covers content, vocabulary, and task fulfillment. Audio-based levels and listenability become available after a successful full-grade retry. [Vision model setup](https://developers.cloudflare.com/workers-ai/models/llama-3.2-11b-vision-instruct/)

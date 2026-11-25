@@ -18,6 +18,7 @@ export default function SpeakingAiReview({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const feedback = session.speakingFeedback;
+  const partial = feedback?.kind === "transcript";
   const row = feedback?.tasks.find((r) => r.task === selected);
   async function grade() {
     if (!ai.user || pending) return;
@@ -37,7 +38,13 @@ export default function SpeakingAiReview({
       }
       if (!answers.length) throw new Error("No saved recordings are available for feedback.");
       body.append("answers", JSON.stringify(answers));
-      save(await speakingRequest<SpeakingFeedback>(ai.user, "feedback", body));
+      save(
+        await speakingRequest<SpeakingFeedback>(
+          ai.user,
+          partial ? "feedback?fullOnly=true" : "feedback",
+          body,
+        ),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not get feedback.");
     } finally {
@@ -50,14 +57,22 @@ export default function SpeakingAiReview({
       <h2>AI Speaking feedback</h2>
       {feedback ? (
         <>
+          {partial && (
+            <p>
+              <strong>Transcript-based feedback</strong> · Request a full grade for listenability and practice
+              levels.
+            </p>
+          )}
           {feedback.overallLevel !== undefined && (
             <p className="ai-level">Overall Speaking practice estimate · Level {feedback.overallLevel}</p>
           )}
-          {row?.level != null ? (
+          {row && (row.level != null || (partial && row.criteria)) ? (
             <>
-              <p className="ai-level">
-                Task {selected} practice estimate · Level {row.level}
-              </p>
+              {row.level != null && (
+                <p className="ai-level">
+                  Task {selected} practice estimate · Level {row.level}
+                </p>
+              )}
               <dl className="ai-criteria">
                 {Object.entries(row.criteria ?? {}).map(([label, detail]) => (
                   <div key={label}>
@@ -80,12 +95,18 @@ export default function SpeakingAiReview({
             </p>
           )}
         </>
-      ) : (
+      ) : null}
+      {(!feedback || (partial && ai.speakingAvailable)) && (
         <>
-          <p>Requesting feedback sends your saved recordings and their prompts to Google Gemini.</p>
+          <p>
+            Requesting feedback sends your saved recordings and prompts to Google Gemini.{" "}
+            {partial
+              ? "This retry requests an audio-based grade."
+              : "If Gemini reaches its quota, Cloudflare may process the recordings and pictures for transcript-based feedback."}
+          </p>
           <WritingAiControls disabled={pending} />
           <button className="button primary" disabled={!ai.user || pending} onClick={grade}>
-            {pending ? "Grading recordings…" : "Get AI feedback"}
+            {pending ? "Grading recordings…" : partial ? "Get full Speaking grade" : "Get AI feedback"}
           </button>
           {error && <p role="alert">{error}</p>}
         </>

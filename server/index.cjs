@@ -24,6 +24,9 @@ function readConfig() {
       projectId: required("FIREBASE_PROJECT_ID"),
       authDomain: required("FIREBASE_AUTH_DOMAIN"),
     },
+    cloudflare: require("./cloudflare.cjs").createCloudflare({
+      accountId: process.env.CLOUDFLARE_ACCOUNT_ID?.trim(), token: process.env.CLOUDFLARE_API_TOKEN?.trim(),
+    }),
     apiKey: required("GEMINI_API_KEY"),
     generationModel: process.env.GEMINI_GENERATION_MODEL ?? "gemini-3.5-flash-lite",
     gradingModel: process.env.GEMINI_GRADING_MODEL ?? "gemini-3.8-flash",

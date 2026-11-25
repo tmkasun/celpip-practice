@@ -72,13 +72,13 @@ export default function WritingAiReview({ session, selected, save }: {
     <section className="card ai-review" aria-labelledby="ai-review">
       <h2 id="ai-review">AI Writing feedback</h2>
       <p className="muted">
-        {answers.length > 1 ? "Tasks " : "Task "}{taskList} will be sent to Google with the prompts when you request feedback.
+        {answers.length > 1 ? "Tasks " : "Task "}{taskList} will be sent to Google with the prompts when you request feedback. Cloudflare may process the same answers if Gemini reaches its quota.
       </p>
       <WritingAiControls disabled={pending} />
       <button type="button" className="button primary" onClick={requestFeedback} disabled={pending || !ai.user}>
         {pending ? "Getting AI feedback…" : "Get AI feedback"}
       </button>
-      {pending && <p className="muted" role="status">Gemini is reviewing your Writing response{answers.length > 1 ? "s" : ""}.</p>}
+      {pending && <p className="muted" role="status">AI is reviewing your Writing response{answers.length > 1 ? "s" : ""}.</p>}
       {error && <p className="notice" role="alert">{error}</p>}
     </section>
   );

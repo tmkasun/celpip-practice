@@ -152,7 +152,7 @@ function providerError(response, payload) {
   return new WritingError(503, "unavailable");
 }
 
-function createGemini({ apiKey, generationModel, gradingModel, gradingFallbackModel, fetcher = fetch }) {
+function createGemini({ apiKey, generationModel, gradingModel, gradingFallbackModel, cloudflare, fetcher = fetch }) {
   return async function run(operation, input) {
     const isGeneration = operation === "prompts";
     const models = [isGeneration ? generationModel : gradingModel];
@@ -172,6 +172,8 @@ function createGemini({ apiKey, generationModel, gradingModel, gradingFallbackMo
         maxOutputTokens: isGeneration ? 2048 : 6144,
       },
     });
+    let result;
+    let usedCloudflare = false;
     let payload;
     for (const model of models) {
       const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent";
@@ -192,21 +194,27 @@ function createGemini({ apiKey, generationModel, gradingModel, gradingFallbackMo
       }
       if (response.ok) break;
 
+      if (response.status === 429 && cloudflare) {
+        result = await cloudflare.json("writing_" + operation, isGeneration ? generateInstructions : gradingInstructions, data, schema);
+        usedCloudflare = true;
+        break;
+      }
       const error = providerError(response, payload);
       if (!canFallback || response.status !== 503 || error.code !== "unavailable") {
         throw error;
       }
     }
 
-    const candidate = payload?.candidates?.[0];
-    if (candidate?.finishReason !== "STOP" || !Array.isArray(candidate.content?.parts)) {
-      throw new WritingError(502, "provider_result");
-    }
-    let result;
-    try {
-      result = JSON.parse(candidate.content.parts.filter((part) => !part.thought).map((part) => part.text ?? "").join(""));
-    } catch {
-      throw new WritingError(502, "provider_result");
+    if (!usedCloudflare) {
+      const candidate = payload?.candidates?.[0];
+      if (candidate?.finishReason !== "STOP" || !Array.isArray(candidate.content?.parts)) {
+        throw new WritingError(502, "provider_result");
+      }
+      try {
+        result = JSON.parse(candidate.content.parts.filter((part) => !part.thought).map((part) => part.text ?? "").join(""));
+      } catch {
+        throw new WritingError(502, "provider_result");
+      }
     }
     if (!valid(result)) throw new WritingError(502, "provider_result");
     if (isGeneration) {

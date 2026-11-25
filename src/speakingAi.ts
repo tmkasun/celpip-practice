@@ -3,6 +3,7 @@ import type { User } from "firebase/auth";
 
 export type SpeakingSnapshot = { task: number; prompt: Prompt };
 export interface SpeakingFeedback {
+  kind?: "transcript";
   overallLevel?: number;
   tasks: {
     task: number;
@@ -30,16 +31,32 @@ export async function speakingRequest<T>(
   if (response.status === 401) response = await send(true);
   if (!response.ok) {
     const code = (await response.json().catch(() => ({}))).error;
+    if (code === "cloudflare_config")
+      throw new Error("Cloudflare Workers AI credentials need to be configured on the server.");
+    if (code === "provider_result")
+      throw new Error("The AI provider returned an unusable response. Try again.");
+    if (code === "cloudflare_unavailable")
+      throw new Error("Cloudflare Workers AI is unavailable. Try again later.");
+    if (response.status === 429 && code !== "account_limit" && code !== "daily_limit") {
+      const seconds = Number(response.headers.get("Retry-After"));
+      const source =
+        code === "busy"
+          ? "The app’s request limit was reached."
+          : code === "cloudflare_limit"
+            ? "Cloudflare’s usage limit was reached."
+            : "Gemini’s request limit was reached.";
+      throw new Error(
+        source + (seconds > 0 ? " Try again in " + seconds + " seconds." : " Try again later."),
+      );
+    }
     throw new Error(
       code === "account_limit" || code === "daily_limit"
         ? "Daily AI limit reached. Try again after midnight Pacific time."
-        : response.status === 429
-          ? "AI is busy. Try again in a minute."
-          : response.status === 413
-            ? "The recordings are too large to send."
-            : response.status === 401
-              ? "Sign in again to use AI Speaking."
-              : "AI Speaking could not finish this request. Try again.",
+        : response.status === 413
+          ? "The recordings are too large to send."
+          : response.status === 401
+            ? "Sign in again to use AI Speaking."
+            : "AI Speaking could not finish this request. Try again.",
     );
   }
   return response.json();

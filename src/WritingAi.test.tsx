@@ -322,3 +322,46 @@ test("restores Speaking feedback and continues a prediction drill with the recor
   expect(screen.getByRole("heading", {name:"Making Predictions"})).toBeInTheDocument();
   expect(calls.mock.calls.every(([url]) => url === "/api/writing/config")).toBe(true);
 });
+
+test("keeps transcript feedback on retry and saves a successful full Speaking grade", async () => {
+  const storage = require("./practiceStorage") as typeof import("./practiceStorage");
+  const recording = new Blob(["recording"], {type:"audio/webm"});
+  jest.spyOn(storage, "loadAudio").mockResolvedValue(recording);
+  const oldCreate = URL.createObjectURL;
+  const oldRevoke = URL.revokeObjectURL;
+  URL.createObjectURL = jest.fn(() => "blob:recording");
+  URL.revokeObjectURL = jest.fn();
+  const session: Session = {
+    id:"partial-attempt", skill:"speaking", status:"completed", mode:"drill", set:1, createdAt:1,
+    responses:[{task:1,finished:true,hasAudio:true}],
+    speakingFeedback:{kind:"transcript",tasks:[{task:1,level:null,criteria:{
+      Vocabulary:{observation:"Precise wording.",revision:"Vary the verbs."}
+    }}]}
+  };
+  localStorage.setItem("celpip-session-" + session.id, JSON.stringify(session));
+  let retries = 0;
+  jest.spyOn(globalThis, "fetch").mockImplementation(async (url, options) => {
+    if (url === "/api/writing/config") return json({speakingEnabled:true, firebase:{
+      apiKey:"key",projectId:"project",authDomain:"localhost",appId:"app"
+    }});
+    expect(url).toBe("/api/speaking/feedback?fullOnly=true");
+    expect((options?.body as FormData).get("1")).toBeInstanceOf(Blob);
+    if (++retries === 1) return { ...json({error:"provider_limit"},429), headers:new Headers({"Retry-After":"12"}) };
+    return json({tasks:[{task:1,level:8,criteria:{}}]});
+  });
+  const { unmount } = open("/review/" + session.id);
+  try {
+    expect(screen.getByText("Transcript-based feedback")).toBeInTheDocument();
+    await signIn();
+    fireEvent.click(screen.getByRole("button",{name:"Get full Speaking grade"}));
+    expect(await screen.findByRole("alert")).toHaveTextContent("12 seconds");
+    expect(loadSessions()[0].speakingFeedback).toEqual(session.speakingFeedback);
+    fireEvent.click(screen.getByRole("button",{name:"Get full Speaking grade"}));
+    expect(await screen.findByText("Task 1 practice estimate · Level 8")).toBeInTheDocument();
+    expect(loadSessions()[0].speakingFeedback?.kind).toBeUndefined();
+  } finally {
+    unmount();
+    URL.createObjectURL = oldCreate;
+    URL.revokeObjectURL = oldRevoke;
+  }
+});
