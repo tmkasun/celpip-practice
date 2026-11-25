@@ -50,14 +50,16 @@ Verify a public Google sign-in, mock, and feedback after rollout. Check Cloud Ru
 
 ## Configure AI Speaking
 
-Enable the same Google sign-in, Gemini key, Firestore, and service account used for Writing. Create a Cloud Storage bucket for the generated illustrations, grant the runtime service account object read/write access, deploy the updated Firestore rules, and set these server environment variables:
+Enable the same Google sign-in, Gemini key, Firestore, and service account used for Writing. Deploy the Firestore rules for the question bank and images. To store new illustrations in Firestore, configure the server as follows.
 
 ```dotenv
 SPEAKING_AI_ENABLED=true
-SPEAKING_IMAGE_BUCKET=your-bucket-name
+SPEAKING_IMAGE_STORE=firestore
 CLOUDFLARE_ACCOUNT_ID=your-account-id
 CLOUDFLARE_API_TOKEN=your-server-token
 ```
+
+For Cloud Storage, set `SPEAKING_IMAGE_STORE=bucket` (the default) and `SPEAKING_IMAGE_BUCKET` to a bucket with object read/write access. Keep the old bucket configured to load previously issued bucket images. Firestore images use individual documents under `speakingAiQuestions/assets/images`. Restart the API after changing storage settings.
 
 Speaking and Writing can be enabled independently. Speaking uses the configured text-generation model and grading model. Set `GEMINI_SPEAKING_GRADING_MODEL` to override the audio-capable grading model. Both skills share the existing `WRITING_AI_*` quota counters. An uncached mock takes one text call and three image calls. Feedback uses one additional quota reservation. Retain the question bank, cursors, and generated images for saved attempts. Only practice illustrations are served from the bucket through the app.
 
@@ -69,6 +71,6 @@ Before enabling Speaking in production, run the automated suites, try Chrome and
 
 Create a Workers AI API token for your account and set the two Cloudflare variables above in the server environment. For Cloud Run, mount the token from Secret Manager. Restart the API after changing credentials. [Cloudflare REST API setup](https://developers.cloudflare.com/workers-ai/get-started/rest-api/)
 
-FLUX.1 schnell generates all new Speaking illustrations. Cached questions and saved illustrations reuse the existing bucket. Gemini is the primary text and grading provider. When Gemini throttles a request, Cloudflare Llama 3.3 70B generates prompts or grades Writing with the same validation. The app's daily and per-minute limits apply before provider routing.
+FLUX.1 schnell generates all new Speaking illustrations. Cached questions reuse their saved illustrations. Gemini is the primary text and grading provider. When Gemini throttles a request, Cloudflare Llama 3.3 70B generates prompts or grades Writing with the same validation. The app's daily and per-minute limits apply before provider routing.
 
 Speaking fallback uses Whisper large-v3-turbo and, for visual tasks, Llama 3.2 Vision to describe the saved images. The account owner must accept the vision model's license using Cloudflare’s documented setup to enable captions. If vision is unavailable, feedback uses the transcript and prompt. Transcript feedback covers content, vocabulary, and task fulfillment. Audio-based levels and listenability become available after a successful full-grade retry. [Vision model setup](https://developers.cloudflare.com/workers-ai/models/llama-3.2-11b-vision-instruct/)

@@ -196,3 +196,42 @@ test("transcript fallback shares one picture caption and retains silent tasks wi
   });
   assert.equal(captions, 1);
 });
+
+test("Firestore images can be reopened for the shared scene while old bucket references still resolve", async t => {
+  const previous = process.env.SPEAKING_IMAGE_STORE;
+  process.env.SPEAKING_IMAGE_STORE = "firestore";
+  t.after(() => {
+    if (previous === undefined) delete process.env.SPEAKING_IMAGE_STORE;
+    else process.env.SPEAKING_IMAGE_STORE = previous;
+  });
+  const db = memoryFirestore();
+  const images = new Map();
+  const collection = db.collection;
+  db.collection = name => {
+    const ref = collection(name);
+    if (name !== "speakingAiQuestions") return ref;
+    return {...ref, doc: id => id !== "assets" ? ref.doc(id) : {
+      collection: child => {
+        assert.equal(child, "images");
+        return {doc: hash => ({
+          set: async ({bytes}) => images.set(hash, bytes),
+          get: async () => ({exists: images.has(hash), get: () => images.get(hash)})
+        })};
+      }
+    }};
+  };
+  const original = await sharp({create:{width:32,height:24,channels:3,background:"blue"}}).png().toBuffer();
+  const api = service(db, null, {
+    fetcher: async () => Response.json({candidates:[{content:{parts:[{text:JSON.stringify([
+      {task:3,context:"At a park.",instruction:"Describe the scene.",scene:"Children playing."}
+    ])}]}}]}),
+    cloudflare: {image: async () => original},
+  }, {bucket: () => ({file: () => ({download: async () => [original]})})});
+  const [description, prediction] = await api.prompts("learner", [3,4], async () => {});
+  const id = description.prompt.image.file.slice(3);
+  assert.match(id, /^fs-[a-f0-9]{64}$/);
+  assert.deepEqual(description.prompt.image, prediction.prompt.image);
+  assert.equal(images.size, 1);
+  assert.equal((await sharp(await api.loadImage(id)).metadata()).format, "webp");
+  assert.deepEqual(await api.loadImage("a".repeat(64)), original);
+});

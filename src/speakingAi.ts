@@ -31,6 +31,10 @@ export async function speakingRequest<T>(
   if (response.status === 401) response = await send(true);
   if (!response.ok) {
     const code = (await response.json().catch(() => ({}))).error;
+    if (code === "image_bucket")
+      throw new Error("The server could not access the Speaking image bucket. Check bucket access or select Firestore image storage.");
+    if (code === "image_database")
+      throw new Error("The server could not save the Speaking picture in Firestore. Check its database access.");
     if (code === "cloudflare_config")
       throw new Error("Cloudflare Workers AI credentials need to be configured on the server.");
     if (code === "provider_result")

@@ -28,10 +28,40 @@ const level = (value) => Number.isInteger(value) && value >= 0 && value <= 12;
 
 function service(db, app, config, storage = getStorage(app)) {
   const bucketName = process.env.SPEAKING_IMAGE_BUCKET;
-  if (!bucketName) throw Error("SPEAKING_IMAGE_BUCKET is required");
-  const bucket = storage.bucket(bucketName);
+  const store = process.env.SPEAKING_IMAGE_STORE || "bucket";
+  if (!["bucket", "firestore"].includes(store)) throw Error("Unknown SPEAKING_IMAGE_STORE");
+  if (store === "bucket" && !bucketName) throw Error("SPEAKING_IMAGE_BUCKET is required");
+  const bucket = bucketName ? storage.bucket(bucketName) : undefined;
   const bank = createQuestionBank(db, Date.now, "speakingAi", (item) => digest(JSON.stringify(item.prompt)));
-  const asset = (id) => bucket.file("speaking/" + id + ".webp");
+  const imageDocument = id => db.collection("speakingAiQuestions").doc("assets").collection("images").doc(id);
+  async function saveImage(bytes) {
+    const hash = digest(bytes);
+    try {
+      if (store === "firestore") {
+        // Leave room for Firestore's document metadata below its 1 MiB document limit.
+        if (bytes.length > 1000000) throw new WritingError(502, "provider_result");
+        await imageDocument(hash).set({ bytes });
+        return "fs-" + hash;
+      }
+      await bucket.file("speaking/" + hash + ".webp").save(bytes, { contentType: "image/webp", resumable: false });
+      return hash;
+    } catch (error) {
+      if (error instanceof WritingError) throw error;
+      console.warn(JSON.stringify({operation:"save_speaking_image", store, code: error.code}));
+      throw new WritingError(503, store === "bucket" ? "image_bucket" : "image_database");
+    }
+  }
+
+  async function loadImage(id) {
+    if (id.startsWith("fs-")) {
+      const image = await imageDocument(id.slice(3)).get();
+      if (!image.exists) throw new WritingError(404, "image_missing");
+      return image.get("bytes");
+    }
+    if (!bucket) throw new WritingError(503, "image_bucket");
+    const [bytes] = await bucket.file("speaking/" + id + ".webp").download();
+    return bytes;
+  }
   async function call(model, parts, system, reserve, onQuota) {
     await reserve();
     const response = await (config.fetcher ?? fetch)(
@@ -87,11 +117,10 @@ function service(db, app, config, storage = getStorage(app)) {
       labels.map(async (alt, index) => {
         const bytes = await sharp(image)
           .extract({ left: slice * index, top: 0, width: slice, height })
-          .resize({ width: 960, withoutEnlargement: true })
+          .resize({ width: 960, height: 960, fit: "inside", withoutEnlargement: true })
           .webp()
           .toBuffer();
-        const id = digest(bytes);
-        await asset(id).save(bytes, { contentType: "image/webp", resumable: false });
+        const id = await saveImage(bytes);
         return { file: "ai/" + id, alt };
       }),
     );
@@ -156,7 +185,7 @@ function service(db, app, config, storage = getStorage(app)) {
     return { prompts };
   }
   return {
-    asset,
+    loadImage,
     async prompts(uid, tasks, reserve) {
       const units = [...new Set(tasks.map((t) => (t === 4 ? 3 : t)))];
       const result = await bank.getPrompts(uid, units, (missing) => generate(missing, reserve));
@@ -193,7 +222,7 @@ function service(db, app, config, storage = getStorage(app)) {
           assert(typeof file === "string", 400);
           if (imagesByFile.has(file)) continue;
           let bytes;
-          if (/^ai\/[a-f0-9]{64}$/.test(file)) [bytes] = await asset(file.slice(3)).download();
+          if (/^ai\/(?:fs-)?[a-f0-9]{64}$/.test(file)) bytes = await loadImage(file.slice(3));
           else {
             assert(/^[a-z-]+\.webp$/.test(file), 400);
             bytes = await fs
@@ -307,8 +336,8 @@ async function transcriptFeedback(answers, files, imagesByFile, cloudflare) {
 
 function routes(app, api, verify, reserve) {
   app.get("/api/speaking/images/:id", async (req, res) => {
-    if (!/^[a-f0-9]{64}$/.test(req.params.id)) return res.sendStatus(404);
-    const [data] = await api.asset(req.params.id).download();
+    if (!/^(?:fs-)?[a-f0-9]{64}$/.test(req.params.id)) return res.sendStatus(404);
+    const data = await api.loadImage(req.params.id);
     res.set("Cache-Control", "public, max-age=31536000, immutable").type("webp").send(data);
   });
   const upload = multer({
