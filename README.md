@@ -6,6 +6,8 @@ Independent CELPIP-General practice with timed Writing and Speaking mocks and in
 
 Use Node 22.9 or newer. Run `npm ci`, then `npm start` to open the app at `http://localhost:3000`. This command also starts the Writing API on port 8080. Press Ctrl+C to stop both services. Configure `.env.server` to enable AI Writing. Use `npm run start:client` to run React by itself, or `npm run build && npm run serve` to serve the production build and Writing API together at `http://localhost:8080`.
 
+Firebase App Hosting selects pnpm because this repository includes `pnpm-lock.yaml`. `engines.pnpm` pins its buildpack to pnpm 10.34.5, and `packageManager` pins local pnpm tooling to the same version. To check the Firebase dependency lockfile locally, use `pnpm install --frozen-lockfile`, then `pnpm build`. Keep this version pin intentional when upgrading: pnpm 11 adds a default minimum release age that can reject recently published packages in a lockfile generated with pnpm 10.
+
 ## Configure Gemini Writing
 
 1. In Google AI Studio, create a Gemini authorization key in your paid project. If the account shows depleted prepaid credits, restore its balance before testing. Set a monthly project spend cap and check the active limits for both models. [API keys](https://aistudio.google.com/apikey) · [Spend](https://aistudio.google.com/spend) · [Rate limits](https://aistudio.google.com/rate-limit)
