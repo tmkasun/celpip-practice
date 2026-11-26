@@ -8,7 +8,7 @@ runConfig:
   # memoryMiB: 512
 
 scripts:
-  buildCommand: npm run build
+  buildCommand: pnpm build
   runCommand: node server/index.cjs
 
 env:

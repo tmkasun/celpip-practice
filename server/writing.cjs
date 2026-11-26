@@ -62,8 +62,8 @@ const responseFormats = Object.fromEntries(["prompts", "feedback"].map((operatio
 const generateInstructions = `
 Create original CELPIP-General Writing practice questions in clear Canadian English.
 Use realistic everyday work, neighbourhood, consumer, education or community situations.
-Make the scenario self-contained and accessible without specialist knowledge. Never reproduce an official or remembered test question.
-For Task 1 give a short scenario, a recipient as a noun phrase such as "the building manager", and three distinct actions the writer should address in an email.
+Make the scenario self-contained and accessible without specialist knowledge. Try make it as close to an official test as possible, But don't remembered test question.
+For Task 1 give a short scenario, a recipient as a noun phrase such as "the building manager" or "friend", and three distinct actions the writer should address in an email.
 For Task 2 give a short scenario with a named decision-maker seeking feedback, and two distinct, equally plausible choices. Return each option as text without an A/B label.
 Use different scenarios when asked for both tasks. For each question, put a complete 150–200 word response to that exact scenario in sampleAnswer. Aim for 170 words. For an email, address the recipient and all three points. For a survey, choose one of the supplied options and support it with specific reasons. Use natural paragraphs. Keep the sample out of the question fields and omit commentary and word counts.
 `;

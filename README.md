@@ -4,9 +4,9 @@ Independent CELPIP-General practice with timed Writing and Speaking mocks and in
 
 ## Run locally
 
-Use Node 22.9 or newer. Run `npm ci`, then `npm start` to open the app at `http://localhost:3000`. This command also starts the Writing API on port 8080. Press Ctrl+C to stop both services. Configure `.env.server` to enable AI Writing. Use `npm run start:client` to run React by itself, or `npm run build && npm run serve` to serve the production build and Writing API together at `http://localhost:8080`.
+Use Node 22.9 or newer and pnpm 10.34.5 (`npm install --global pnpm@10.34.5`). Run `pnpm install --frozen-lockfile`, then `pnpm start` to open the app at `http://localhost:3000`. This command also starts the Writing API on port 8080. Press Ctrl+C to stop both services. Configure `.env.server` to enable AI Writing. Use `pnpm start:client` to run React by itself, or `pnpm build && pnpm serve` to serve the production build and Writing API together at `http://localhost:8080`.
 
-Firebase App Hosting selects pnpm because this repository includes `pnpm-lock.yaml`. `engines.pnpm` pins its buildpack to pnpm 10.34.5, and `packageManager` pins local pnpm tooling to the same version. To check the Firebase dependency lockfile locally, use `pnpm install --frozen-lockfile`, then `pnpm build`. Keep this version pin intentional when upgrading: pnpm 11 adds a default minimum release age that can reject recently published packages in a lockfile generated with pnpm 10.
+Firebase App Hosting selects pnpm because this repository includes `pnpm-lock.yaml`. `engines.pnpm` pins its buildpack to pnpm 10.34.5, and `packageManager` pins local pnpm tooling to the same version. Use pnpm for root-project dependency installation in local development, Docker, and Firebase builds. If switching from npm, stop the development server and remove the root `node_modules` directory before installing with pnpm to prevent duplicate ESLint plugins. The independent `functions/` package keeps its own npm setup. Keep this version pin intentional when upgrading: pnpm 11 adds a default minimum release age that can reject recently published packages in a lockfile generated with pnpm 10.
 
 ## Configure Gemini Writing
 
@@ -14,7 +14,7 @@ Firebase App Hosting selects pnpm because this repository includes `pnpm-lock.ya
 2. Add Firebase to the hosting project. Register a web app, enable the **Google** provider in Firebase Authentication, and add `localhost` and the eventual public hostname under **Authentication → Settings → Authorized domains**. Use the web app’s project ID, app ID, auth domain, and public Firebase API key. [Firebase Google sign-in setup](https://firebase.google.com/docs/auth/web/google-signin)
 3. Create the hosting project’s default Firestore database in Native mode. Deploy `firestore.rules` to restrict `writingAiQuota`, `writingAiDaily`, `writingAiQuestions` (including its subcollections), and `writingAiSeen` to server access before enabling the question cache. The server service account needs `roles/datastore.user`. Enable expiration for daily counters with `gcloud firestore fields ttls update expiresAt --collection-group=writingAiDaily --enable-ttl --project=YOUR_HOSTING_PROJECT`.
 4. For local AI testing, set `WRITING_AI_ENABLED=true` in `.env.server` and supply `FIREBASE_PROJECT_ID`, `FIREBASE_APP_ID`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_WEB_API_KEY`, and the server-only `GEMINI_API_KEY`. Use Application Default Credentials with Firestore access for the Firebase project. You can obtain them with `gcloud auth application-default login`.
-5. Run `npm start` and finish a Writing mock with built-in or AI-generated prompts. On the review page, sign in with Google and select **Get AI feedback** to grade the finished responses.
+5. Run `pnpm start` and finish a Writing mock with built-in or AI-generated prompts. On the review page, sign in with Google and select **Get AI feedback** to grade the finished responses.
 
 The default models are `gemini-3.5-flash-lite` for prompts and `gemini-3.8-flash` for feedback. Both model IDs are server settings. The default limits count prompt generation, illustration, and feedback operations. A provider fallback shares its original reservation. They allow six per Google account per day, 10 globally per rolling minute, and 300 globally per day. Daily counters reset at midnight Pacific time. Cached questions do not consume these limits, even when generation or feedback is at its limit. A mock that needs both new questions generates them together using one quota reservation, followed by one for feedback.
 
@@ -26,9 +26,9 @@ Set `GEMINI_GRADING_FALLBACK_MODEL` to let the server try one alternate feedback
 
 ## Validate before publishing
 
-Run `CI=true npm test -- --watchAll=false --runInBand`, `npm run test:server`, and `npm run build`.
+Run `CI=true pnpm test --watchAll=false --runInBand`, `pnpm test:server`, and `pnpm build`.
 
-With a funded Gemini key in `.env.server`, run `npm run test:writing:live -- /path/to/references.json`. Use a local JSON array with three published reference attempts in ascending level order, such as Levels 5, 8, and 11. Each entry has `expectedLevel` and `answers`. Each answer has `task` (1 or 2), `text`, and `prompt` with `context`, `instruction`, and `points` (three email points or two survey options). The check generates a mock, grades the three reference pairs, and checks their ordering and distance from the reference levels. Read the generated mock for realistic scenarios and plausible options. Then sign in to the app locally and complete one full mock to verify Firebase, quotas, and saving in the browser. [Published CELPIP scoring samples](https://www.celpip.ca/scoring-levels/)
+With a funded Gemini key in `.env.server`, run `pnpm test:writing:live /path/to/references.json`. Use a local JSON array with three published reference attempts in ascending level order, such as Levels 5, 8, and 11. Each entry has `expectedLevel` and `answers`. Each answer has `task` (1 or 2), `text`, and `prompt` with `context`, `instruction`, and `points` (three email points or two survey options). The check generates a mock, grades the three reference pairs, and checks their ordering and distance from the reference levels. Read the generated mock for realistic scenarios and plausible options. Then sign in to the app locally and complete one full mock to verify Firebase, quotas, and saving in the browser. [Published CELPIP scoring samples](https://www.celpip.ca/scoring-levels/)
 
 ## Deploy to Cloud Run
 
